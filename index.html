@@ -90,7 +90,9 @@ function buildHome(){
   </section>
   <section class="homeSearch">
     <label for="homeQuery">Looking for a specific fish?</label>
-    <input class="input" id="homeQuery" type="search" placeholder="Search fish across all reserves…" autocomplete="off">
+    <input class="input" id="homeQuery" type="search" placeholder="Search fish by name…" autocomplete="off">
+    <div class="homeSearchControls"><select class="select" id="homeReserveFilter" aria-label="Filter fish by reserve"><option value="">All reserves</option></select></div>
+    <div class="homeResultsMeta"><span id="homeResultsCount">Search across all reserves</span><button class="homeClear" id="clearHomeSearch" type="button">Clear</button></div>
     <div class="homeResults" id="homeResults" aria-live="polite"></div>
   </section>
   <section class="section" id="reserveDirectory">
