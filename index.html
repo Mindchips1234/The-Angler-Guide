@@ -44,6 +44,13 @@ dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);bo
 .homeHint{color:var(--muted);font-size:12px;line-height:1.6;margin-top:18px}
 #home[hidden],#rv[hidden],#fv[hidden]{display:none}
 @media(max-width:600px){.homeHero{padding:23px}.homeHero:after{right:0;bottom:-10px;opacity:.08}.homeReserve img{height:115px}}
+.homeSearchControls{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;margin-top:10px}
+.homeSearchControls .select{min-width:190px}
+.homeResultsMeta{display:flex;justify-content:space-between;align-items:center;gap:10px;color:var(--muted);font-size:12px;margin-top:12px}
+.homeClear{border:1px solid var(--line);background:transparent;color:var(--text);border-radius:10px;padding:9px 12px;cursor:pointer}
+.homeResult:hover{border-color:var(--accent)}
+.homeResult .homeBait{color:#c6e6d9;font-size:12px;margin-top:5px}
+@media(max-width:600px){.homeSearchControls{grid-template-columns:1fr}.homeSearchControls .select{width:100%;min-width:0}}
 </style></head><body><div class="app"><header class="top"><button class="switch" id="back" hidden aria-label="Back to reserve">←</button><div class="brand">🎣 <b><span>Angler</span> Guide</b></div><button class="switch" id="homeBtn" aria-label="Home" title="Home">⌂</button><select id="rsel" class="reserveSelect" aria-label="Reserve"></select><button class="switch" id="gear" aria-label="Settings">⚙</button></header><main><section id="home" hidden></section><section id="rv"></section><section id="fv" hidden></section></main></div>
 <dialog id="set"><h2>Settings</h2><small>Weight &amp; depth</small><div class="seg"><button class="switch" data-u="metric">Metric</button><button class="switch" data-u="imperial">Imperial</button></div><small>Temperature</small><div class="seg"><button class="switch" data-t="celsius">°C</button><button class="switch" data-t="fahrenheit">°F</button></div><button class="switch" id="close" style="width:100%">Done</button></dialog>
 <script>
@@ -100,12 +107,15 @@ function buildHome(){
     <div class="homeReserveGrid">${names.map(n=>{const r=DATA.reserves[n];return `<button class="homeReserve" data-home-reserve="${esc(n)}"><img src="${RIMG[n]||''}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'"><h3>${esc(n)}</h3><p>${esc(REGION[n]||r.region)}</p><div class="mini">${esc(r.stats.join(' · '))}</div><span class="linkbtn">Open reserve →</span></button>`}).join('')}</div>
     <p class="homeHint">Tip: choose a reserve to see its interactive map, filter fish by bait or habitat, and open individual fish guides.</p>
   </section>`;
+  $('#homeReserveFilter').innerHTML='<option value="">All reserves</option>'+names.map(n=>'<option value="'+esc(n)+'">'+esc(n)+'</option>').join('');
   home.oninput=e=>{if(e.target.id==='homeQuery')renderHomeResults(e.target.value)};
+  home.onchange=e=>{if(e.target.id==='homeReserveFilter')renderHomeResults($('#homeQuery').value)};
   home.onclick=e=>{
     const card=e.target.closest('[data-home-reserve]');
     if(card)go(card.dataset.homeReserve);
     if(e.target.closest('#browseReserves'))$('#reserveDirectory').scrollIntoView({behavior:'smooth',block:'start'});
     if(e.target.closest('#randomFish')){const rname=names[Math.floor(Math.random()*names.length)],fish=DATA.reserves[rname].fish;go(rname,fish[Math.floor(Math.random()*fish.length)])}
+    if(e.target.closest('#clearHomeSearch')){$('#homeQuery').value='';$('#homeReserveFilter').value='';renderHomeResults('');$('#homeQuery').focus()}
     const result=e.target.closest('[data-home-fish]');
     if(result){const [rname,...parts]=result.dataset.homeFish.split('::');go(rname,parts.join('::'))}
   };
