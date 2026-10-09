@@ -44,6 +44,30 @@ dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);bo
 .homeHint{color:var(--muted);font-size:12px;line-height:1.6;margin-top:18px}
 #home[hidden],#rv[hidden],#fv[hidden]{display:none}
 @media(max-width:600px){.homeHero{padding:23px}.homeHero:after{right:0;bottom:-10px;opacity:.08}.homeReserve img{height:115px}}
+.homeSearchControls{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;margin-top:10px}
+.homeSearchControls .select{min-width:190px}
+.homeResultsMeta{display:flex;justify-content:space-between;align-items:center;gap:10px;color:var(--muted);font-size:12px;margin-top:12px}
+.homeClear{border:1px solid var(--line);background:transparent;color:var(--text);border-radius:10px;padding:9px 12px;cursor:pointer}
+.homeResult:hover{border-color:var(--accent)}
+.homeResult .homeBait{color:#c6e6d9;font-size:12px;margin-top:5px}
+@media(max-width:600px){.homeSearchControls{grid-template-columns:1fr}.homeSearchControls .select{width:100%;min-width:0}}
+
+/* Fishing tools roadmap */
+.toolGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:14px;margin-top:14px}
+.toolCard{padding:18px;border:1px solid var(--line);border-radius:18px;background:var(--panel)}
+.toolCard h2{margin:0 0 8px;font-size:19px}.toolCard p{color:var(--muted);font-size:12px;line-height:1.6}
+.toolFields{display:grid;gap:9px;margin-top:14px}.toolFields label{display:grid;gap:6px;color:var(--muted);font-size:12px}
+.toolFields .select,.toolFields .input{width:100%;font-size:15px}
+.toolActions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.toolAction{border:1px solid var(--line);border-radius:10px;background:#0e191c;color:var(--text);padding:10px 12px;cursor:pointer;font:inherit;font-size:12px}
+.toolAction.primary{background:var(--accent);color:#071613;border-color:var(--accent);font-weight:800}
+.toolOutput{margin-top:12px;padding:13px;border-radius:12px;background:#0e191c;border:1px solid var(--line);font-size:12px;line-height:1.65}
+.toolOutput strong{color:#c6f1e4}.caughtBadge{color:var(--gold);font-size:11px;font-weight:800}
+.fishTools{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.caughtList{display:grid;gap:8px;margin-top:12px}
+.caughtItem{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:#0e191c}
+.caughtItem button{border:0;background:transparent;color:var(--text);cursor:pointer;text-align:left;font:inherit}
+@media(max-width:600px){.toolCard{padding:14px}.toolActions>*{flex:1}}
 </style></head><body><div class="app"><header class="top"><button class="switch" id="back" hidden aria-label="Back to reserve">←</button><div class="brand">🎣 <b><span>Angler</span> Guide</b></div><button class="switch" id="homeBtn" aria-label="Home" title="Home">⌂</button><select id="rsel" class="reserveSelect" aria-label="Reserve"></select><button class="switch" id="gear" aria-label="Settings">⚙</button></header><main><section id="home" hidden></section><section id="rv"></section><section id="fv" hidden></section></main></div>
 <dialog id="set"><h2>Settings</h2><small>Weight &amp; depth</small><div class="seg"><button class="switch" data-u="metric">Metric</button><button class="switch" data-u="imperial">Imperial</button></div><small>Temperature</small><div class="seg"><button class="switch" data-t="celsius">°C</button><button class="switch" data-t="fahrenheit">°F</button></div><button class="switch" id="close" style="width:100%">Done</button></dialog>
 <script>
@@ -90,20 +114,41 @@ function buildHome(){
   </section>
   <section class="homeSearch">
     <label for="homeQuery">Looking for a specific fish?</label>
-    <input class="input" id="homeQuery" type="search" placeholder="Search fish across all reserves…" autocomplete="off">
+    <input class="input" id="homeQuery" type="search" placeholder="Search fish by name…" autocomplete="off">
+    <div class="homeSearchControls"><select class="select" id="homeReserveFilter" aria-label="Filter fish by reserve"><option value="">All reserves</option></select></div>
+    <div class="homeResultsMeta"><span id="homeResultsCount">Search across all reserves</span><button class="homeClear" id="clearHomeSearch" type="button">Clear</button></div>
     <div class="homeResults" id="homeResults" aria-live="polite"></div>
+  </section>
+  <section class="section" id="fishingTools">
+    <div class="homeSectionHead"><div><h2>Fishing tools</h2><p>Build a quick plan, save fish you’ve caught, and keep useful setups close at hand.</p></div></div>
+    <div class="toolGrid">
+      <div class="toolCard"><h2>Quick fishing planner</h2><p>Pick a reserve and fish to get a fast setup using the guide’s listed bait preferences.</p>
+        <div class="toolFields"><label>Reserve<select id="plannerReserve" class="select"></select></label><label>Target fish<select id="plannerFish" class="select"></select></label><label>When are you fishing?<select id="plannerTime" class="select"><option>Any time</option><option>Daytime</option><option>Nighttime</option></select></label><label>Water clarity<select id="plannerClarity" class="select"><option value="any">Not sure / any</option><option value="clear">Clear water</option><option value="murky">Murky water</option></select></label></div>
+        <div class="toolActions"><button class="toolAction primary" id="makePlan">Build my plan</button><button class="toolAction" id="openPlanFish">Open fish guide</button></div><div id="plannerOutput" class="toolOutput" aria-live="polite">Choose your target and build a plan.</div>
+      </div>
+      <div class="toolCard"><h2>My catch collection <span class="caughtBadge" id="caughtCount">0 saved</span></h2><p>Mark fish as caught on their guide pages. Your collection is saved on this device/browser.</p><div id="caughtList" class="caughtList"><div class="mutedBox">No fish marked yet. Open a fish guide and tap “Mark as caught”.</div></div><div class="toolActions"><button class="toolAction" id="clearCaught">Clear collection</button></div></div>
+    </div>
   </section>
   <section class="section" id="reserveDirectory">
     <div class="homeSectionHead"><div><h2>Explore reserves</h2><p>Choose a destination to browse its fish, map and fishing information.</p></div></div>
     <div class="homeReserveGrid">${names.map(n=>{const r=DATA.reserves[n];return `<button class="homeReserve" data-home-reserve="${esc(n)}"><img src="${RIMG[n]||''}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'"><h3>${esc(n)}</h3><p>${esc(REGION[n]||r.region)}</p><div class="mini">${esc(r.stats.join(' · '))}</div><span class="linkbtn">Open reserve →</span></button>`}).join('')}</div>
     <p class="homeHint">Tip: choose a reserve to see its interactive map, filter fish by bait or habitat, and open individual fish guides.</p>
   </section>`;
+  $('#homeReserveFilter').innerHTML='<option value="">All reserves</option>'+names.map(n=>'<option value="'+esc(n)+'">'+esc(n)+'</option>').join('');
+  $('#plannerReserve').innerHTML=names.map(n=>'<option value="'+esc(n)+'">'+esc(n)+'</option>').join('');
+  populatePlannerFish();renderCaught();
   home.oninput=e=>{if(e.target.id==='homeQuery')renderHomeResults(e.target.value)};
+  home.onchange=e=>{if(e.target.id==='homeReserveFilter')renderHomeResults($('#homeQuery').value);if(e.target.id==='plannerReserve')populatePlannerFish();if(e.target.id==='plannerFish'||e.target.id==='plannerTime'||e.target.id==='plannerClarity')buildQuickPlan()};
   home.onclick=e=>{
     const card=e.target.closest('[data-home-reserve]');
     if(card)go(card.dataset.homeReserve);
     if(e.target.closest('#browseReserves'))$('#reserveDirectory').scrollIntoView({behavior:'smooth',block:'start'});
     if(e.target.closest('#randomFish')){const rname=names[Math.floor(Math.random()*names.length)],fish=DATA.reserves[rname].fish;go(rname,fish[Math.floor(Math.random()*fish.length)])}
+    if(e.target.closest('#clearHomeSearch')){$('#homeQuery').value='';$('#homeReserveFilter').value='';renderHomeResults('');$('#homeQuery').focus()}
+    if(e.target.closest('#makePlan'))buildQuickPlan();
+    if(e.target.closest('#openPlanFish')){const rn=$('#plannerReserve').value,fn=$('#plannerFish').value;if(rn&&fn)go(rn,fn)}
+    if(e.target.closest('#clearCaught')){if(confirm('Clear all saved fish from this device?')){saveCaught([]);renderCaught()}}
+    const caught=e.target.closest('[data-caught-open]');if(caught){const [rn,...parts]=caught.dataset.caughtOpen.split('::');go(rn,parts.join('::'))}
     const result=e.target.closest('[data-home-fish]');
     if(result){const [rname,...parts]=result.dataset.homeFish.split('::');go(rname,parts.join('::'))}
   };
@@ -111,14 +156,22 @@ function buildHome(){
 }
 function renderHomeResults(query){
   const target=$('#homeResults');if(!target)return;
-  const q=query.trim().toLowerCase();
-  if(!q){target.innerHTML='<div class="homeHint">Start typing a fish name to search the guide across every reserve.</div>';return}
-  const matches=[];
-  for(const [rn,r] of Object.entries(DATA.reserves)){
-    for(const n of r.fish){if(n.toLowerCase().includes(q)){matches.push({reserve:rn,fish:n});if(matches.length>=12)break}}
-    if(matches.length>=12)break;
+  const q=query.trim().toLowerCase(),selected=$('#homeReserveFilter')?$('#homeReserveFilter').value:'';
+  const names=selected?[selected]:Object.keys(DATA.reserves),matches=[];
+  for(const rn of names){
+    const r=DATA.reserves[rn];if(!r)continue;
+    for(const n of r.fish){
+      if(!q||n.toLowerCase().includes(q)){
+        const d=r.records[n]||{};
+        matches.push({reserve:rn,fish:n,bait:d.preferred||(d.baits&&d.baits[0]&&d.baits[0][0])||'See fish guide'});
+      }
+    }
   }
-  target.innerHTML=matches.length?matches.map(x=>`<button class="homeResult" data-home-fish="${esc(x.reserve+'::'+x.fish)}"><span><strong>${esc(x.fish)}</strong><small>${esc(x.reserve)}</small></span><span aria-hidden="true">→</span></button>`).join(''):'<div class="mutedBox">No fish found. Try a different name.</div>';
+  const count=$('#homeResultsCount');
+  if(count)count.textContent=(q||selected)?(matches.length+' fish found'):'Search across all reserves';
+  if(!q&&!selected){target.innerHTML='<div class="homeHint">Type a fish name or choose a reserve to browse its fish. Select any result to open its full guide.</div>';return}
+  const shown=matches.slice(0,24);
+  target.innerHTML=shown.length?shown.map(x=>'<button class="homeResult" data-home-fish="'+esc(x.reserve+'::'+x.fish)+'"><span><strong>'+esc(x.fish)+'</strong><small>'+esc(x.reserve)+'</small><small class="homeBait">Preferred bait: '+esc(x.bait)+'</small></span><span aria-hidden="true">→</span></button>').join('')+(matches.length>shown.length?'<div class="homeHint">Showing the first '+shown.length+' of '+matches.length+' results. Add more letters to narrow your search.</div>':''):'<div class="mutedBox">No fish found. Try another name or select a different reserve.</div>';
 }
 
 function buildReserve(){
@@ -156,6 +209,7 @@ function fishDyn(f){
   const d=rec()[f],F=(a,b)=>`<div class="row"><small>${a}</small><strong>${esc(b)}</strong></div>`;
   $('#fpills').innerHTML=`<div class="pill">🐟 ${esc(wt(d.weight))}</div><div class="pill">🌡️ Ideal ${tc(d.temperature.ideal)}</div><div class="pill">🕐 ${esc(d.time)}</div>`;
   $('#ffacts').innerHTML=F('Preferred bait',d.preferred)+F('Best time',d.time)+F('Max weight',wt(d.weight))+F('Water temp',trange(d.temperature))+F('Ideal temp',tc(d.temperature.ideal))+F('Spawn depth',sd(d.spawnDepth))+F('Max water depth',dn(d.maxDepth));
+  const caughtBtn=$('#toggleCaught');if(caughtBtn)caughtBtn.textContent=isCaught(R,f)?'✓ Marked as caught':'＋ Mark as caught';
 }
 function fishPage(f){
   const r=DATA.reserves[R],d=r.records[f],key=R+'/'+f;rv.hidden=true;fv.hidden=false;
@@ -165,15 +219,52 @@ function fishPage(f){
     hrows=ranks.map(x=>`<tr><td class="rank">${esc(x.rank)}</td><td>${esc(x.hooks.join(', '))}</td></tr>`).join('')+Object.entries(lg).map(([n,h])=>`<tr class="legendary-row"><td class="rank">Legendary</td><td>${esc(n)} — ${esc(h.join(', '))}</td></tr>`).join(''),
     tiers=[...new Set(d.baits.map(b=>b[1]))].sort((a,b)=>b-a),
     baits=tiers.map(p=>`<div class="tier">${p}%</div>`+d.baits.filter(b=>b[1]===p).map(b=>`<span class="tag${b[0]===d.preferred?' pref':''}">${b[0]===d.preferred?'★ ':''}${esc(b[0])}</span>`).join('')).join('');
-    fv.innerHTML=`<div class="hero"><div class="eyebrow">${esc(R)} · Fish guide</div><h1>${esc(f)}</h1><div class="stats" id="fpills"></div></div><div class="detailgrid section"><div><div class="card"><div class="imageWrap"><img class="heroimg" src="${d.image}" alt="${esc(f)}" referrerpolicy="no-referrer" onerror="imgFail(this)"></div><div class="rows" id="ffacts" style="margin-top:12px"></div><div class="section"><h2>Habitat</h2>${tag(d.habitats)}</div></div><div class="card" style="margin-top:18px"><h2>Hotspot map</h2>${d.hotspotMap?`<div class="map" id="fmap"></div><div class="note">${esc(d.hotspotStatus||'')} Drag to pan, pinch or +/− to zoom.</div>`:'<div class="mutedBox">No hotspot map is published for this species yet.</div>'}</div></div><div><div class="card"><h2>Bait &amp; lure preferences</h2>${baits}</div><div class="card" style="margin-top:18px"><h2>Traits</h2>${tag(d.traits)}</div><div class="card" style="margin-top:18px"><h2>Hook size by target rank</h2><table class="hooks"><thead><tr><th>Rank</th><th>Hook</th></tr></thead><tbody>${hrows||'<tr><td colspan="2">No hook chart.</td></tr>'}</tbody></table></div></div></div><div class="source">Source: <a href="${d.source}" target="_blank" rel="noopener">The Angler Wiki</a> (community-maintained; may contain errors).</div>`;
+    fv.innerHTML=`<div class="hero"><div class="eyebrow">${esc(R)} · Fish guide</div><h1>${esc(f)}</h1><div class="stats" id="fpills"></div><div class="fishTools"><button class="toolAction primary" id="toggleCaught">${isCaught(R,f)?'✓ Marked as caught':'＋ Mark as caught'}</button><button class="toolAction" id="copyFishSetup">Copy fishing setup</button><button class="toolAction" id="quickPlanFromFish">Use in quick planner</button></div><div id="fishActionNote" class="note" aria-live="polite"></div></div><div class="detailgrid section"><div><div class="card"><div class="imageWrap"><img class="heroimg" src="${d.image}" alt="${esc(f)}" referrerpolicy="no-referrer" onerror="imgFail(this)"></div><div class="rows" id="ffacts" style="margin-top:12px"></div><div class="section"><h2>Habitat</h2>${tag(d.habitats)}</div></div><div class="card" style="margin-top:18px"><h2>Hotspot map</h2>${d.hotspotMap?`<div class="map" id="fmap"></div><div class="note">${esc(d.hotspotStatus||'')} Drag to pan, pinch or +/− to zoom.</div>`:'<div class="mutedBox">No hotspot map is published for this species yet.</div>'}</div></div><div><div class="card"><h2>Bait &amp; lure preferences</h2>${baits}</div><div class="card" style="margin-top:18px"><h2>Traits</h2>${tag(d.traits)}</div><div class="card" style="margin-top:18px"><h2>Hook size by target rank</h2><table class="hooks"><thead><tr><th>Rank</th><th>Hook</th></tr></thead><tbody>${hrows||'<tr><td colspan="2">No hook chart.</td></tr>'}</tbody></table></div></div></div><div class="source">Source: <a href="${d.source}" target="_blank" rel="noopener">The Angler Wiki</a> (community-maintained; may contain errors).</div>`;
     if(d.hotspotMap)mkMap($('#fmap'),r.map).show(d.hotspotMap);
   }
   fishDyn(f);
+}
+
+function caughtKey(rn,fn){return rn+'::'+fn}
+function getCaught(){try{const v=JSON.parse(store.get('caught','[]'));return Array.isArray(v)?v:[]}catch(e){return []}}
+function saveCaught(list){store.set('caught',JSON.stringify(list))}
+function isCaught(rn,fn){return getCaught().includes(caughtKey(rn,fn))}
+function toggleCaught(rn,fn){const key=caughtKey(rn,fn),list=getCaught();saveCaught(list.includes(key)?list.filter(x=>x!==key):[...list,key]);renderCaught()}
+function renderCaught(){
+  const target=$('#caughtList'),count=$('#caughtCount');if(!target)return;
+  const list=getCaught();if(count)count.textContent=list.length+' saved';
+  target.innerHTML=list.length?list.map(key=>{const [rn,...parts]=key.split('::'),fn=parts.join('::');return DATA.reserves[rn]&&DATA.reserves[rn].records[fn]?'<div class="caughtItem"><button data-caught-open="'+esc(key)+'"><strong>'+esc(fn)+'</strong><small style="display:block;color:var(--muted);margin-top:4px">'+esc(rn)+'</small></button><span class="caughtBadge">Caught ✓</span></div>':''}).join('')||'<div class="mutedBox">Your saved list is empty.</div>':'<div class="mutedBox">No fish marked yet. Open a fish guide and tap “Mark as caught”.</div>';
+}
+function populatePlannerFish(){
+  const rn=$('#plannerReserve')?.value,select=$('#plannerFish');if(!select||!rn||!DATA.reserves[rn])return;
+  const prior=select.value,fish=DATA.reserves[rn].fish;select.innerHTML=fish.map(n=>'<option value="'+esc(n)+'">'+esc(n)+'</option>').join('');
+  if(fish.includes(prior))select.value=prior;buildQuickPlan();
+}
+function buildQuickPlan(){
+  const rn=$('#plannerReserve')?.value,fn=$('#plannerFish')?.value;if(!rn||!fn||!DATA.reserves[rn])return;
+  const d=DATA.reserves[rn].records[fn],tm=$('#plannerTime').value,clarity=$('#plannerClarity').value,target=$('#plannerOutput');
+  if(!d||!target)return;
+  const ranked=[...d.baits].sort((a,b)=>b[1]-a[1]),preferred=d.preferred||ranked[0]?.[0]||'Check the fish guide';
+  const top=ranked.slice(0,3).map(b=>esc(b[0])+' ('+b[1]+'%)').join(', ')||esc(preferred);
+  const timeNote=tm==='Any time'?'The guide lists '+d.time+'.':(d.time.toLowerCase().includes(tm.toLowerCase())?'Your selected time matches the guide’s listed activity time.':'Your selected time differs from the guide’s listed time ('+d.time+'); it may still be worth trying.');
+  const clarityNote=clarity==='clear'?'Clear water: start with a natural-looking bait or a smaller presentation if fish seem cautious.':clarity==='murky'?'Murky water: try a more visible bait or a slower presentation so fish have time to find it.':'Choose a bait from the listed preferences, then adjust based on what you observe.';
+  target.innerHTML='<strong>Target:</strong> '+esc(fn)+'<br><strong>Reserve:</strong> '+esc(rn)+'<br><strong>Start with:</strong> '+esc(preferred)+'<br><strong>Other listed options:</strong> '+top+'<br><strong>Time:</strong> '+timeNote+'<br><strong>Water tip:</strong> '+clarityNote+'<br><small style="color:var(--muted)">Bait rankings come from the guide data. Conditions tips are general suggestions, not guaranteed results.</small>';
+}
+async function copyFishSetup(rn,fn){
+  const d=DATA.reserves[rn]?.records[fn];if(!d)return;
+  const textOut='Angler Guide fishing setup\nReserve: '+rn+'\nTarget fish: '+fn+'\nPreferred bait: '+(d.preferred||'Not listed')+'\nBest time: '+(d.time||'Not listed')+'\nTop listed baits: '+d.baits.slice().sort((a,b)=>b[1]-a[1]).slice(0,5).map(b=>b[0]+' ('+b[1]+'%)').join(', ')+'\nHabitat: '+(d.habitats||[]).join(', ')+'\nSource: '+(d.source||'Angler Guide');
+  const note=$('#fishActionNote');
+  try{await navigator.clipboard.writeText(textOut);if(note)note.textContent='Fishing setup copied.'}
+  catch(e){const area=document.createElement('textarea');area.value=textOut;area.style.position='fixed';area.style.opacity='0';document.body.appendChild(area);area.select();let ok=false;try{ok=document.execCommand('copy')}catch(_){}area.remove();if(note)note.textContent=ok?'Fishing setup copied.':'Copy is blocked by this browser. You can copy the setup from the fish guide manually.'}
 }
 function showFish(f){
   if(f){if(!lastFish)scrollRv=scrollY;fishPage(f);if(f!==lastFish)scrollTo(0,0)}
   else{rv.hidden=false;fv.hidden=true;if(lastFish)scrollTo(0,scrollRv)}
   lastFish=f;back.hidden=!f;document.title=f?f+' · Angler Guide':'Angler Guide 2.0';
+  if(f&&fv){fv.onclick=e=>{if(e.target.closest('#toggleCaught')){toggleCaught(R,f);e.target.closest('#toggleCaught').textContent=isCaught(R,f)?'✓ Marked as caught':'＋ Mark as caught';const note=$('#fishActionNote');if(note)note.textContent=isCaught(R,f)?'Saved to your catch collection on this device.':'Removed from your catch collection.'}
+    if(e.target.closest('#copyFishSetup'))copyFishSetup(R,f);
+    if(e.target.closest('#quickPlanFromFish')){goHome();setTimeout(()=>{if($('#plannerReserve')){$('#plannerReserve').value=R;populatePlannerFish();$('#plannerFish').value=f;buildQuickPlan();$('#fishingTools').scrollIntoView({behavior:'smooth',block:'start'})}},80)}
+  }}
 }
 function route(){
   const raw=location.hash.slice(1);
