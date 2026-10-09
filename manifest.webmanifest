@@ -1,38 +1,25 @@
 {
-  "name": "Angler Guide \u2014 Call of the Wild: The Angler",
+  "name": "The Angler Guide",
   "short_name": "Angler Guide",
-  "description": "Interactive fishing guide for all five reserves in Call of the Wild: The Angler.",
-  "id": "./",
-  "start_url": "./index.html",
-  "scope": "./",
-  "display": "standalone",
-  "orientation": "any",
-  "background_color": "#091113",
-  "theme_color": "#091113",
   "icons": [
     {
       "src": "icon-192.png",
       "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
+      "type": "image/png"
     },
     {
       "src": "icon-512.png",
       "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
+      "type": "image/png"
     },
     {
       "src": "icon-maskable-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
-    },
-    {
-      "src": "icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any"
     }
-  ]
+  ],
+  "theme_color": "#111827",
+  "background_color": "#111827",
+  "display": "standalone"
 }
