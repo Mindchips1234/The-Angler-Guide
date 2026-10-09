@@ -123,14 +123,22 @@ function buildHome(){
 }
 function renderHomeResults(query){
   const target=$('#homeResults');if(!target)return;
-  const q=query.trim().toLowerCase();
-  if(!q){target.innerHTML='<div class="homeHint">Start typing a fish name to search the guide across every reserve.</div>';return}
-  const matches=[];
-  for(const [rn,r] of Object.entries(DATA.reserves)){
-    for(const n of r.fish){if(n.toLowerCase().includes(q)){matches.push({reserve:rn,fish:n});if(matches.length>=12)break}}
-    if(matches.length>=12)break;
+  const q=query.trim().toLowerCase(),selected=$('#homeReserveFilter')?$('#homeReserveFilter').value:'';
+  const names=selected?[selected]:Object.keys(DATA.reserves),matches=[];
+  for(const rn of names){
+    const r=DATA.reserves[rn];if(!r)continue;
+    for(const n of r.fish){
+      if(!q||n.toLowerCase().includes(q)){
+        const d=r.records[n]||{};
+        matches.push({reserve:rn,fish:n,bait:d.preferred||(d.baits&&d.baits[0]&&d.baits[0][0])||'See fish guide'});
+      }
+    }
   }
-  target.innerHTML=matches.length?matches.map(x=>`<button class="homeResult" data-home-fish="${esc(x.reserve+'::'+x.fish)}"><span><strong>${esc(x.fish)}</strong><small>${esc(x.reserve)}</small></span><span aria-hidden="true">→</span></button>`).join(''):'<div class="mutedBox">No fish found. Try a different name.</div>';
+  const count=$('#homeResultsCount');
+  if(count)count.textContent=(q||selected)?(matches.length+' fish found'):'Search across all reserves';
+  if(!q&&!selected){target.innerHTML='<div class="homeHint">Type a fish name or choose a reserve to browse its fish. Select any result to open its full guide.</div>';return}
+  const shown=matches.slice(0,24);
+  target.innerHTML=shown.length?shown.map(x=>'<button class="homeResult" data-home-fish="'+esc(x.reserve+'::'+x.fish)+'"><span><strong>'+esc(x.fish)+'</strong><small>'+esc(x.reserve)+'</small><small class="homeBait">Preferred bait: '+esc(x.bait)+'</small></span><span aria-hidden="true">→</span></button>').join('')+(matches.length>shown.length?'<div class="homeHint">Showing the first '+shown.length+' of '+matches.length+' results. Add more letters to narrow your search.</div>':''):'<div class="mutedBox">No fish found. Try another name or select a different reserve.</div>';
 }
 
 function buildReserve(){
