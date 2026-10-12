@@ -2,7 +2,7 @@
   "id": "./",
   "name": "The Angler Guide",
   "short_name": "Angler Guide",
-  "description": "Offline-ready fishing guide for The Angler: reserves, fish, baits, hook sizes and hotspot maps.",
+  "description": "Offline-ready fishing guide for The Angler: reserves, fish, legendaries, missions, collectibles, gear and a catch log.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
@@ -28,9 +28,21 @@
   ],
   "shortcuts": [
     {
-      "name": "My catches",
-      "short_name": "Catches",
-      "url": "./#/catches",
+      "name": "My log",
+      "short_name": "Log",
+      "url": "./#/log",
+      "icons": [
+        {
+          "src": "icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Guides",
+      "short_name": "Guides",
+      "url": "./#/guides",
       "icons": [
         {
           "src": "icon-192.png",

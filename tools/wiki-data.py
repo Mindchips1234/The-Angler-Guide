@@ -8,7 +8,7 @@ Writes:
   data/collectibles.json every collectible per reserve, grouped by type
   data/gear.json         rods, reels, lines and hooks with their stats
   data/fish-refresh.json latest facts for each fish page the app links to, including
-                         the weight range of every rank (merged into index.html by
+                         the weight range of every rank (merged into data/fish-data.js by
                          tools/apply-fish-refresh.py)
 
 Pages are cached in <cache-dir> (default .wiki-cache/) so re-runs don't hit the wiki again.
@@ -223,7 +223,7 @@ def fish_refresh(sources):
 
 
 if __name__ == '__main__':
-    html = open(os.path.join(ROOT, 'index.html'), encoding='utf-8').read().split('\n')
+    html = open(os.path.join(ROOT, 'data', 'fish-data.js'), encoding='utf-8').read().split('\n')
     line = next(l for l in html if l.startswith('const DATA='))
     DATA = json.loads(line[len('const DATA='):line.index(';const RIMG=')])
     sources = sorted({r['source'] for res in DATA['reserves'].values() for r in res['records'].values()})

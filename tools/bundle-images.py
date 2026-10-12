@@ -2,7 +2,7 @@
 
 Usage:  python3 tools/bundle-images.py [cache-dir]
 
-Covers fish pictures, reserve maps, hotspot maps and reserve logos (index.html), and
+Covers fish pictures, reserve maps, hotspot maps and reserve logos (data/fish-data.js), and
 legendary fish pictures and location maps (data/legendary.json). Images are resized and
 re-encoded as WebP so the whole set stays small; a URL that already points into img/
 is left alone, so the script can be re-run after tools/wiki-data.py.
@@ -50,7 +50,7 @@ def local(url, kind):
     return './' + folder + '/' + name
 
 
-path = os.path.join(ROOT, 'index.html')
+path = os.path.join(ROOT, 'data', 'fish-data.js')
 lines = open(path, encoding='utf-8').read().split('\n')
 i = next(n for n, l in enumerate(lines) if l.startswith('const DATA='))
 line = lines[i]; a = line.index(';const RIMG='); b = line.index(';', a + 1)

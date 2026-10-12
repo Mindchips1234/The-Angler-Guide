@@ -1,4 +1,4 @@
-"""Merge data/fish-refresh.json (from tools/wiki-data.py) into the fish data in index.html.
+"""Merge data/fish-refresh.json (from tools/wiki-data.py) into the fish data in data/fish-data.js.
 
 Usage:  python3 tools/apply-fish-refresh.py
 
@@ -7,7 +7,7 @@ Everything else in the fish data is left as it is.
 """
 import json, os
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-path = os.path.join(ROOT, 'index.html')
+path = os.path.join(ROOT, 'data', 'fish-data.js')
 lines = open(path, encoding='utf-8').read().split('\n')
 i = next(n for n, l in enumerate(lines) if l.startswith('const DATA='))
 line = lines[i]; cut = line.index(';const RIMG=')
