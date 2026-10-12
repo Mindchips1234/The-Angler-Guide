@@ -1,6 +1,7 @@
 // Bump V on every release. Installed copies download the new files in the background
 // and show an "A new version is ready" banner; tapping Update switches to it.
-const V='angler-guide-v3-0',IMG='angler-guide-img-v2',SHELL=['./','./index.html','./manifest.webmanifest','./fish3d.js','./vendor/three.module.min.js','./icon.svg','./icon-192.png','./icon-512.png','./icon-maskable-512.png','./apple-touch-icon.png','./favicon.ico'];
+// Fish textures (fish-tex/) are cached the first time each fish page is opened.
+const V='angler-guide-v3-0',IMG='angler-guide-img-v2',SHELL=['./','./index.html','./manifest.webmanifest','./fish3d.js','./fish-shapes.js','./vendor/three.module.min.js','./icon.svg','./icon-192.png','./icon-512.png','./icon-maskable-512.png','./apple-touch-icon.png','./favicon.ico'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(V).then(c=>c.addAll(SHELL.map(u=>new Request(u,{cache:'reload'})))).then(()=>{if(!self.registration.active)return self.skipWaiting()})));
 self.addEventListener('message',e=>{if(e.data==='skipWaiting')self.skipWaiting()});
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==V&&x!==IMG).map(x=>caches.delete(x)))).then(()=>self.clients.claim())));

@@ -1,7 +1,10 @@
-// Stylised 3D fish for the fish guide pages.
-// Every species is generated from a body archetype (shape, fins, swim style)
-// plus its own colours and markings, so no model files are needed.
+// 3D fish for the fish guide pages.
+// Each fish is shaped from the outline of its wiki picture (fish-shapes.js) and
+// wrapped in that picture (fish-tex/). The body archetype below sets its thickness
+// and swim style. If a picture can't load, a generated model with painted
+// colours and markings is used instead. The crab and crayfish are built by hand.
 import * as THREE from './vendor/three.module.min.js';
+import SHAPES from './fish-shapes.js';
 
 const L = 2; // body length, snout to tail base
 const TAU = Math.PI * 2;
@@ -96,7 +99,7 @@ const SPECIES = {
   'Ide': {a:'cyprinid',c:['#3a4a4a','#b8b8a8','#ecece0'],fin:'#9a7a6a',low:'#c86a4a'},
   'Japanese Dace': {a:'cyprinid',c:['#4a4a3a','#c8c8b8','#f0f0e8'],fin:'#9a9a80',low:'#d8603a',H:.17,p:[{k:'stripes',c:'#d84a2a',ys:[.62,.82],w:.03,x:[.15,.95],a:.8},{k:'stripes',c:'#2a2a20',ys:[.42],w:.02,x:[.2,.95],a:.6}]},
   'Japanese Eel': {a:'eel',c:['#2a3a3a','#5a6a60','#e8e8e0'],fin:'#3a4a48'},
-  'Japanese Freshwater Crab': {crab:true,c:['#b8442a','#c8643a','#e8b08a']},
+  'Japanese Freshwater Crab': {crab:true,c:['#3e3328','#c8762e','#9aa088','#d8913f']},
   'Japanese Smelt': {a:'smelt',c:['#8a9a80','#d0d4c8','#f0f0ec'],fin:'#c8ccc0',p:[{k:'stripes',c:'#e8f0f0',ys:[.48],w:.025,x:[.15,.98],a:.9}]},
   'Kokanee Salmon': {a:'salmon',c:['#7a2a22','#c8302a','#e8d8c8'],fin:'#3a4a3a',low:'#c8402a',p:[{k:'head',c:'#3a5a3a',x:.2}],hump:.06},
   'Lake Trout': {a:'trout',c:['#4a5048','#8a9088','#e8e4d8'],fin:'#5a6058',tail:['fork',.45,.34,.24],p:[{k:'spots',c:'#e8e0c0',n:90,r:[.006,.012],y:[0,.65]}]},
@@ -124,7 +127,7 @@ const SPECIES = {
   'Sakhalin Taimen': {a:'salmon',c:['#3a4a40','#a0a090','#e8e4dc'],fin:'#5a5a50',low:'#a04030',H:.16,p:[{k:'spots',c:'#1e2420',n:40,r:[.005,.009],y:[.05,.45],shape:'x'}]},
   'Sauger': {a:'zander',c:['#5a5030','#a89060','#e8e0c8'],fin:'#7a7050',p:[{k:'bars',c:'#2e2a18',n:4,x:[.25,.85],y:[0,.55],w:.08,a:.6,wobble:.03}],dorsSpot:'#1a1a12'},
   'Shovelnose Sturgeon': {a:'sturgeon',c:['#8a7a5a','#b8a888','#ece4d4'],fin:'#8a7a5a'},
-  'Signal Crayfish': {crayfish:true,c:['#5b3b2c','#6e4a36','#b8382a']},
+  'Signal Crayfish': {crayfish:true,c:['#6a6238','#9a7a58','#8e2a1e','#2a2a24']},
   'Smallmouth Bass': {a:'bass',c:['#5a5030','#a89050','#e8dcb0'],fin:'#7a6a40',iris:'#c8302a',p:[{k:'bars',c:'#4a3e1a',n:9,x:[.2,.95],y:[.1,.7],w:.035,a:.55,wobble:.02}]},
   'Smallmouth Yellowfish': {a:'yellowfish',c:['#5a5a3a','#b8a860','#ece4c0'],fin:'#c0a050',snout:.9},
   'Sockeye Salmon': {a:'salmon',c:['#9a2a22','#d0302a','#e0d0c0'],fin:'#4a6a3a',low:'#c8402a',p:[{k:'head',c:'#4a6a3a',x:.2}],hump:.07},
@@ -328,11 +331,46 @@ function buildFish(P,name,swimTo){
   }};
 }
 
+// ------------------------------------------------------ picture-based model
+// S: traced outline in picture pixels (x samples from snout to tail base, top/bottom edges).
+// The body is a tube through that outline; a cut-out of the whole picture sits on the
+// midline for the fins, tail and barbels. Both use the picture as their texture.
+function swimField(P,head,total){
+  const sp=P.swimP;let phase=0,burst=0,next=3,A=sp.A,f=sp.f;
+  return{lat:x=>{const s=(head-x)/total;return A*sp.e(Math.max(0,s))*Math.sin(TAU*s/sp.wl-phase)-A*.18*Math.sin(-phase)},
+    step(time,dt,playing){A=sp.A;f=sp.f*(P.slow?.8:1);
+      if(sp.burst){if(time>next){burst=time;next=time+3.5+Math.random()*3}const b=smooth((time-burst)/.12)*(1-smooth((time-burst-.35)/.5));A=lerp(A,.13,b);f=lerp(f,3,b)}
+      if(playing)phase+=TAU*f*dt}};
+}
+function buildTextured(P,S,tex,swimTo){
+  const root=new THREE.Group(),W=S.w,H=S.h,k=2.45/W,cx=W/2,cy=H/2,X=px=>(cx-px)*k,Y=py=>(cy-py)*k;
+  const ratio=Math.min(1.1,P.W/P.H),n=S.x.length,M=36,pos=[],uv=[],idx=[];
+  const ring=(px,top,bot,t)=>{const mid=(top+bot)/2,r=(bot-top)/2;let w=r*ratio;if(P.flat&&t<.4)w*=1+P.flat*(1-t/.4)**2*1.1;
+    for(let j=0;j<=M;j++){const th=j/M*TAU,py=mid-r*Math.cos(th);pos.push(X(px),Y(py),w*Math.sin(th)*k);uv.push(px/W,py/H)}};
+  const m0=(S.t[0]+S.b[0])/2,m1=(S.t[n-1]+S.b[n-1])/2;
+  ring(S.x[0]-1,m0,m0,0);
+  for(let i=0;i<n;i++)ring(S.x[i],S.t[i],S.b[i],i/(n-1));
+  ring(S.x[n-1]+2,m1,m1,1);
+  for(let i=0;i<n+1;i++)for(let j=0;j<M;j++){const a=i*(M+1)+j,b=a+M+1;idx.push(a,b,a+1,b,b+1,a+1)}
+  const bg=new THREE.BufferGeometry();bg.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));bg.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));bg.setIndex(idx);bg.computeVertexNormals();
+  const look={map:tex,emissiveMap:tex,emissive:new THREE.Color('#ffffff'),emissiveIntensity:.42,roughness:.5,metalness:.05};
+  const bodyMat=new THREE.MeshStandardMaterial(look),finMat=new THREE.MeshStandardMaterial({...look,side:THREE.DoubleSide,alphaTest:.45});
+  root.add(new THREE.Mesh(bg,bodyMat));
+  const pg=new THREE.PlaneGeometry(W*k,H*k,72,1),pa=pg.attributes.position,pu=pg.attributes.uv;
+  for(let i=0;i<pa.count;i++){const x=pa.getX(i),y=pa.getY(i);pu.setXY(i,(cx-x/k)/W,(cy-y/k)/H)}
+  const plane=new THREE.Mesh(pg,finMat);plane.renderOrder=-1;root.add(plane);
+  const deform=[{geo:bg,normals:true},{geo:pg}];for(const d of deform)d.base=d.geo.attributes.position.array.slice();
+  const field=swimField(P,X(S.x[0]),(W-S.x[0])*k),sp=P.swimP;
+  return{root,disposables:[bg,pg,bodyMat,finMat,tex],update(time,dt,playing){field.step(time,dt,playing);
+    for(const d of deform){const a=d.geo.attributes.position,arr=a.array,b=d.base;for(let i=0;i<arr.length;i+=3)arr[i+2]=b[i+2]+field.lat(b[i]);a.needsUpdate=true;if(d.normals)d.geo.computeVertexNormals()}
+    swimTo.position.y=sp.bob*Math.sin(time*.9);swimTo.rotation.z=(sp.tilt||0)+.03*Math.sin(time*.55);swimTo.rotation.y=.07*Math.sin(time*.3)}};
+}
+
 // ---------------------------------------------------------------- crustaceans
 function limb(mat,len,r){const g=new THREE.CylinderGeometry(r*.8,r,len,8);g.translate(0,-len/2,0);return new THREE.Mesh(g,mat)}
 function buildCrab(P){
-  const root=new THREE.Group(),dis=[],[shell,leg,under]=P.c;
-  const mS=new THREE.MeshStandardMaterial({color:shell,roughness:.45,metalness:.08}),mL=new THREE.MeshStandardMaterial({color:leg,roughness:.5}),mU=new THREE.MeshStandardMaterial({color:under,roughness:.6});dis.push(mS,mL,mU);
+  const root=new THREE.Group(),dis=[],[shell,leg,under,claw]=P.c;
+  const mS=new THREE.MeshStandardMaterial({color:shell,roughness:.45,metalness:.08}),mL=new THREE.MeshStandardMaterial({color:leg,roughness:.5}),mU=new THREE.MeshStandardMaterial({color:under,roughness:.6}),mC=new THREE.MeshStandardMaterial({color:claw,roughness:.45});dis.push(mS,mL,mU,mC);
   const body=new THREE.Mesh(new THREE.SphereGeometry(.5,32,20),mS);body.scale.set(1.25,.42,1.05);root.add(body);
   const belly=new THREE.Mesh(new THREE.SphereGeometry(.48,24,12,0,TAU,Math.PI/2,Math.PI/2),mU);belly.scale.set(1.18,.3,1);root.add(belly);
   for(const s of[1,-1]){const st=limb(mL,.14,.025);st.position.set(.5,.12,s*.14);st.rotation.z=Math.PI;root.add(st);
@@ -342,19 +380,19 @@ function buildCrab(P){
     for(let i=0;i<4;i++){const hip=new THREE.Group(),a=limb(mL,.42,.038),knee=new THREE.Group(),b=limb(mL,.5,.028);
       hip.position.set(.25-i*.2,0,s*.45);a.rotation.x=s*-1.2;hip.add(a);knee.position.set(0,-Math.cos(1.2)*.42,s*Math.sin(1.2)*.42);b.rotation.x=s*-.45;knee.add(b);hip.add(knee);
       hip.rotation.y=s*(.35-i*.25);root.add(hip);legs.push({hip,knee,s,i,y0:hip.rotation.y});dis.push(a.geometry,b.geometry)}
-    const arm=new THREE.Group(),up=limb(mS,.35,.06),palm=new THREE.Mesh(new THREE.SphereGeometry(.16,16,12),mS),fin=new THREE.Group(),f1=new THREE.Mesh(new THREE.ConeGeometry(.05,.26,8),mU),f2=new THREE.Mesh(new THREE.ConeGeometry(.045,.24,8),mS);
+    const big=s>0?1.35:1,arm=new THREE.Group(),up=limb(mL,.35,.06),palm=new THREE.Mesh(new THREE.SphereGeometry(.16*big,16,12),mC),fin=new THREE.Group(),f1=new THREE.Mesh(new THREE.ConeGeometry(.05*big,.26*big,8),mC),f2=new THREE.Mesh(new THREE.ConeGeometry(.045*big,.24*big,8),mC);
     arm.position.set(.5,0,s*.32);up.rotation.z=Math.PI/2+.3;up.rotation.y=s*-.6;arm.add(up);palm.scale.set(1.3,.75,.8);palm.position.set(.32,.1,s*.2);arm.add(palm);
     f1.rotation.z=-Math.PI/2;f1.position.set(.55,.06,s*.2);arm.add(f1);fin.position.set(.42,.16,s*.2);f2.rotation.z=-Math.PI/2;f2.position.set(.12,0,0);fin.add(f2);arm.add(fin);root.add(arm);
     claws.push({fin,arm,s});dis.push(up.geometry,palm.geometry,f1.geometry,f2.geometry)}
-  dis.push(body.geometry,belly.geometry);root.scale.setScalar(1.25);root.position.y=.15;
+  dis.push(body.geometry,belly.geometry);root.scale.setScalar(.95);root.position.y=.15;
   return {root,disposables:dis,update(t,dt,playing){if(!playing)return;
     const w=t*5;root.position.z=.18*Math.sin(t*.9);root.position.y=.15+.025*Math.abs(Math.sin(w));
     for(const l of legs){const ph=w+(l.i%2?Math.PI:0)+(l.s>0?0:Math.PI/2);l.hip.rotation.y=l.y0+.22*Math.sin(ph);l.hip.rotation.x=l.s*.2*Math.max(0,Math.cos(ph))}
     for(const c of claws){c.fin.rotation.z=.35*Math.max(0,Math.sin(t*2.2+c.s));c.arm.rotation.y=.1*Math.sin(t*.8+c.s)}}};
 }
 function buildCrayfish(P){
-  const root=new THREE.Group(),dis=[],[shell,legC,red]=P.c;
-  const mS=new THREE.MeshStandardMaterial({color:shell,roughness:.45,metalness:.1}),mL=new THREE.MeshStandardMaterial({color:legC,roughness:.5}),mR=new THREE.MeshStandardMaterial({color:red,roughness:.5}),mW=new THREE.MeshStandardMaterial({color:'#d8f0ec',roughness:.4});dis.push(mS,mL,mR,mW);
+  const root=new THREE.Group(),dis=[],[shell,legC,red,ant]=P.c;
+  const mS=new THREE.MeshStandardMaterial({color:shell,roughness:.45,metalness:.1}),mL=new THREE.MeshStandardMaterial({color:legC,roughness:.5}),mR=new THREE.MeshStandardMaterial({color:red,roughness:.5}),mW=new THREE.MeshStandardMaterial({color:'#d8f0ec',roughness:.4}),mA=new THREE.MeshStandardMaterial({color:ant,roughness:.5});dis.push(mS,mL,mR,mW,mA);
   const thorax=new THREE.Mesh(new THREE.CapsuleGeometry(.2,.45,8,16),mS);thorax.rotation.z=Math.PI/2;thorax.scale.set(1,1,.95);thorax.position.x=.25;root.add(thorax);
   const rost=new THREE.Mesh(new THREE.ConeGeometry(.06,.22,8),mS);rost.rotation.z=-Math.PI/2;rost.position.set(.68,.05,0);root.add(rost);dis.push(thorax.geometry,rost.geometry);
   // Abdomen: chained pivots so the tail can curl under for the escape flick.
@@ -370,10 +408,10 @@ function buildCrayfish(P){
   const ants=[],legs=[],claws=[];
   for(const s of[1,-1]){
     const pts=[];for(let i=0;i<=10;i++){const f=i/10;pts.push(new THREE.Vector3(f*1.1-.2*f*f*f*4,.15*f,s*(.1+f*.5)))}
-    const ag=new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),24,.009,4),a=new THREE.Group();a.position.set(.66,.08,s*.06);a.add(new THREE.Mesh(ag,mR));root.add(a);ants.push({a,s});dis.push(ag);
+    const ag=new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),24,.009,4),a=new THREE.Group();a.position.set(.66,.08,s*.06);a.add(new THREE.Mesh(ag,mA));root.add(a);ants.push({a,s});dis.push(ag);
     for(let i=0;i<4;i++){const hip=new THREE.Group(),l=limb(mL,.32,.022);hip.position.set(.45-i*.12,-.1,s*.14);l.rotation.x=s*-.9;hip.add(l);root.add(hip);legs.push({hip,s,i});dis.push(l.geometry)}
-    const arm=new THREE.Group(),up=limb(mS,.38,.05),palm=new THREE.Mesh(new THREE.SphereGeometry(.13,16,12),mS),patch=new THREE.Mesh(new THREE.SphereGeometry(.05,10,8),mW),under=new THREE.Mesh(new THREE.SphereGeometry(.12,16,10,0,TAU,Math.PI/2,Math.PI/2),mR);
-    const fixed=new THREE.Mesh(new THREE.ConeGeometry(.055,.32,8),mS),mv=new THREE.Group(),mvf=new THREE.Mesh(new THREE.ConeGeometry(.045,.3,8),mS);
+    const arm=new THREE.Group(),up=limb(mR,.38,.05),palm=new THREE.Mesh(new THREE.SphereGeometry(.13,16,12),mR),patch=new THREE.Mesh(new THREE.SphereGeometry(.05,10,8),mW),under=new THREE.Mesh(new THREE.SphereGeometry(.12,16,10,0,TAU,Math.PI/2,Math.PI/2),mR);
+    const fixed=new THREE.Mesh(new THREE.ConeGeometry(.055,.32,8),mR),mv=new THREE.Group(),mvf=new THREE.Mesh(new THREE.ConeGeometry(.045,.3,8),mR);
     arm.position.set(.55,-.02,s*.15);up.rotation.z=Math.PI/2+.25;up.rotation.y=s*-.7;arm.add(up);
     const hand=new THREE.Group();hand.position.set(.32,.08,s*.27);palm.scale.set(1.7,.7,.9);patch.position.set(-.18,.05,s*.04);under.scale.set(1.6,.5,.85);hand.add(palm,patch,under);
     fixed.rotation.z=-Math.PI/2;fixed.position.set(.36,0,-s*.03);hand.add(fixed);mv.position.set(.2,.03,s*.05);mvf.rotation.z=-Math.PI/2;mvf.position.set(.15,0,0);mv.add(mvf);hand.add(mv);
@@ -401,12 +439,15 @@ export function mount(host,name){
   const key=new THREE.DirectionalLight('#ffffff',2.2);key.position.set(2,4,3);scene.add(key);
   const rim=new THREE.DirectionalLight('#7fe0c8',1.1);rim.position.set(-3,1.5,-2.5);scene.add(rim);
   const view=new THREE.Group(),swim=new THREE.Group();view.add(swim);scene.add(view);
-  const model=P.crab?buildCrab(P):P.crayfish?buildCrayfish(P):buildFish(P,name,swim);swim.add(model.root);
+  let model=null,gone=false;const use=m=>{if(gone){for(const d of m.disposables)d.dispose&&d.dispose();return}model=m;swim.add(m.root);host.classList.add('m3dReady')};
+  const slug=name.replace(/[^A-Za-z0-9]+/g,'-').replace(/-+$/,''),S=SHAPES[slug];
+  if(crust||!S)use(P.crab?buildCrab(P):P.crayfish?buildCrayfish(P):buildFish(P,name,swim));
+  else new THREE.TextureLoader().load('./fish-tex/'+slug+'.webp',tex=>{tex.colorSpace=THREE.SRGBColorSpace;tex.flipY=false;tex.anisotropy=renderer.capabilities.getMaxAnisotropy();use(buildTextured(P,S,tex,swim))},undefined,()=>use(buildFish(P,name,swim)));
   // Drifting specks for an underwater feel.
   const pg=new THREE.BufferGeometry(),pp=[];for(let i=0;i<160;i++)pp.push((Math.random()-.5)*7,(Math.random()-.5)*4,(Math.random()-.5)*4-1);
   pg.setAttribute('position',new THREE.Float32BufferAttribute(pp,3));const pm=new THREE.PointsMaterial({color:'#bfeee0',size:.025,transparent:true,opacity:.45,depthWrite:false});
   const specks=new THREE.Points(pg,pm);scene.add(specks);
-  const rest={yaw:crust?-.7:-.4,pitch:crust?.62:.16,zoom:1};let yaw=rest.yaw,pitch=rest.pitch,zoom=1,fit=4,vy=0,idle=0,playing=true,visible=true,raf=0,last=0;
+  const rest={yaw:crust?-.7:Math.PI+.4,pitch:crust?.62:.16,zoom:1};let yaw=rest.yaw,pitch=rest.pitch,zoom=1,fit=4,vy=0,idle=0,playing=true,visible=true,raf=0,last=0;
   const resize=()=>{const w=host.clientWidth,h=host.clientHeight;if(!w||!h)return;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();
     const tn=Math.tan(THREE.MathUtils.degToRad(camera.fov/2));fit=Math.max(1.55/(tn*camera.aspect),(crust?.95:.75)/tn)};
   const ro=new ResizeObserver(resize);ro.observe(host);resize();
@@ -427,13 +468,13 @@ export function mount(host,name){
   const frame=now=>{raf=0;const dt=Math.min(.05,last?(now-last)/1000:.016);last=now;if(playing)clock+=dt;
     if(!pts.size){yaw+=vy;vy*=.92;idle+=dt;if(idle>3&&playing)yaw+=dt*.18}
     view.rotation.set(0,yaw,0);const dist=fit*zoom;camera.position.set(0,Math.sin(pitch)*dist,Math.cos(pitch)*dist);camera.lookAt(0,0,0);
-    model.update(clock,playing?dt:0,playing);
+    if(model)model.update(clock,playing?dt:0,playing);
     if(playing){const a=pg.attributes.position.array;for(let i=1;i<a.length;i+=3){a[i]+=dt*.06;if(a[i]>2)a[i]=-2}pg.attributes.position.needsUpdate=true}
     renderer.render(scene,camera);loop()};
   const loop=()=>{if(!raf&&visible&&!document.hidden)raf=requestAnimationFrame(frame)};
   const io=new IntersectionObserver(es=>{visible=es[0].isIntersecting;if(visible){last=0;loop()}});io.observe(host);
   const vis=()=>{if(!document.hidden){last=0;loop()}};document.addEventListener('visibilitychange',vis);loop();
   return{dispose(){cancelAnimationFrame(raf);raf=-1;io.disconnect();ro.disconnect();document.removeEventListener('visibilitychange',vis);
-    for(const d of model.disposables)d.dispose&&d.dispose();pg.dispose();pm.dispose();renderer.dispose();renderer.forceContextLoss()}};
+    gone=true;if(model)for(const d of model.disposables)d.dispose&&d.dispose();pg.dispose();pm.dispose();renderer.dispose();renderer.forceContextLoss()}};
 }
 export const SPECIES_NAMES=Object.keys(SPECIES);
