@@ -444,7 +444,7 @@ export function mount(host,name){
   const rim=new THREE.DirectionalLight('#7fe0c8',1.1);rim.position.set(-3,1.5,-2.5);scene.add(rim);
   const view=new THREE.Group(),swim=new THREE.Group();view.add(swim);scene.add(view);
   let model=null,gone=false,ext={r:1.3,h:.75};
-  const use=(m,kind)=>{host.dataset.model=kind;if(gone){for(const d of m.disposables)d.dispose&&d.dispose();return}model=m;swim.add(m.root);
+  const use=(m,kind)=>{if(gone){for(const d of m.disposables)d.dispose&&d.dispose();return}host.dataset.model=kind;model=m;swim.add(m.root);
     m.update(0,0,false);const box=new THREE.Box3().setFromObject(m.root);
     ext={r:Math.max(Math.abs(box.min.x),Math.abs(box.max.x),Math.abs(box.min.z),Math.abs(box.max.z)),h:Math.max(Math.abs(box.min.y),Math.abs(box.max.y))};resize();
     hint.textContent=matchMedia('(pointer: fine)').matches?'Drag to spin · Ctrl + scroll to zoom · double-click to reset':'Drag to spin · pinch to zoom';host.classList.add('m3dReady')};
