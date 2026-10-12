@@ -1,6 +1,13 @@
 {
+  "id": "./",
   "name": "The Angler Guide",
   "short_name": "Angler Guide",
+  "description": "Offline-ready fishing guide for The Angler: reserves, fish, baits, hook sizes and hotspot maps.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "theme_color": "#091113",
+  "background_color": "#091113",
   "icons": [
     {
       "src": "icon-192.png",
@@ -18,8 +25,5 @@
       "type": "image/png",
       "purpose": "maskable"
     }
-  ],
-  "theme_color": "#111827",
-  "background_color": "#111827",
-  "display": "standalone"
+  ]
 }
