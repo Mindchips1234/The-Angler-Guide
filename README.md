@@ -1,14 +1,40 @@
 # Angler Guide 2.0
 
-All five reserves, 96 fish. Open `index.html` in a browser, or serve the folder over HTTPS to install it (Add to Home Screen / Install App).
+A fan-made, offline-ready field guide for the game *The Angler*: all five reserves and 96 fish entries (84 species), with baits, hook sizes, water conditions and hotspot maps.
 
-What's new in 2.0
-- Slim header with a settings sheet; unit, temperature and last reserve are remembered
-- Back button and browser/Android back now work; search, filters and scroll position are kept
-- Search fish, bait or habitat; filter by time, temperature, bait and habitat
-- Cleaner fish page: grouped baits (preferred bait starred), rank-first hook chart, no repeated info
-- Phone-friendly maps: drag, pinch zoom, clear overlay; zoom resets per fish
-- Real PNG icons (incl. maskable + Apple), network-first service worker, image caching for offline
+## Use it
 
-Release note: bump `V` in `service-worker.js` for every release. Fish data lives only inside `index.html` (`const DATA`).
-Hotspot maps are only published for Golden Ridge so far.
+- **Quick look:** open `index.html` in a browser.
+- **Install as an app:** serve the folder over HTTPS (e.g. GitHub Pages), then use *Add to Home Screen* / *Install App*. Once visited, it works offline.
+
+For local testing with the service worker, any static server works:
+
+```sh
+python3 -m http.server 8000   # then open http://localhost:8000
+```
+
+## Features
+
+- **Home screen** – search every reserve for a fish, filter by reserve, or jump to a random fish.
+- **Reserve pages** – interactive map with per-fish hotspot overlays (drag, pinch or +/− to zoom) and a fish list filterable by time, temperature, bait and habitat.
+- **Fish guides** – grouped bait preferences (preferred bait starred), rank-first hook chart, legendary hooks and habitat/traits.
+- **Fishing tools** – quick planner (reserve, fish, time, water clarity), a catch collection saved on the device, and a “copy fishing setup” button.
+- **Settings** – metric/imperial and °C/°F; units, temperature and last reserve are remembered.
+- Browser and Android back buttons work; search, filters and scroll position are kept.
+
+## Project layout
+
+| File | Purpose |
+| --- | --- |
+| `index.html` | The whole app: styles, fish data (`const DATA`), reserve logos (`const RIMG`) and code |
+| `service-worker.js` | Offline support: network-first for app files, cache-first for wiki images |
+| `manifest.webmanifest` | Install metadata and icons |
+| `icon-*.png`, `apple-touch-icon.png`, `favicon.ico`, `icon.svg` | App icons |
+
+## Releasing
+
+Bump `V` in `service-worker.js` on every release so installed copies pick up the new version.
+
+## Credits
+
+Fish data, images and maps come from [The Angler Wiki](https://theangler.org/) (community-maintained; may contain errors). This project is not affiliated with the game's developers.
