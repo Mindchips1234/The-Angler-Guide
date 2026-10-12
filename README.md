@@ -1,10 +1,10 @@
-# Angler Guide 2.0
+# Angler Guide 3.0
 
-A fan-made, offline-ready field guide for the game *The Angler*: all five reserves and 96 fish entries (84 species), with baits, hook sizes, water conditions and hotspot maps.
+A fan-made, offline-ready field guide for the game *The Angler*, made by Vanderholst Studios: all five reserves and 96 fish entries (84 species), with baits, hook sizes, water conditions, hotspot maps and a 3D model of every species.
 
 ## Use it
 
-- **Quick look:** open `index.html` in a browser.
+- **Quick look:** open `index.html` in a browser. (The 3D models and offline mode need it served over http/https, see below.)
 - **Install as an app:** serve the folder over HTTPS (e.g. GitHub Pages), then use *Add to Home Screen* / *Install App*. Once visited, it works offline.
 
 For local testing with the service worker, any static server works:
@@ -15,25 +15,34 @@ python3 -m http.server 8000   # then open http://localhost:8000
 
 ## Features
 
+- **App feel** – intro animation on launch (tap to skip), bottom tab bar on phones (Home, Reserves, Catches, Settings), sliding screen transitions, swipe from the left edge to go back in the installed app, and a settings bottom sheet.
+- **3D fish models** – every species has a stylised 3D model you can spin (drag), zoom (pinch, or Ctrl + scroll) and pause. Each swims the way that fish does: eels wriggle, trout and bass beat their tails, catfish glide, pike hover then dart, sunfish scull with their side fins. The crab scuttles and the crayfish flicks its tail.
+- **My catches** – a dedicated screen with progress per reserve and every fish you've marked as caught.
 - **Home screen** – search every reserve for a fish, filter by reserve, or jump to a random fish.
 - **Reserve pages** – interactive map with per-fish hotspot overlays (drag, pinch or +/− to zoom) and a fish list filterable by time, temperature, bait and habitat.
 - **Fish guides** – grouped bait preferences (preferred bait starred), rank-first hook chart, legendary hooks and habitat/traits.
 - **Fishing tools** – quick planner (reserve, fish, time, water clarity), a catch collection saved on the device, and a “copy fishing setup” button.
 - **Settings** – metric/imperial and °C/°F; units, temperature and last reserve are remembered.
 - Browser and Android back buttons work; search, filters and scroll position are kept.
+- **Updates & offline** – the app opens instantly from its offline copy. When a new release is out, a “A new version is ready” banner appears; tap **Update** to switch. An “Offline” badge shows when there's no connection.
 
 ## Project layout
 
 | File | Purpose |
 | --- | --- |
-| `index.html` | The whole app: styles, fish data (`const DATA`), reserve logos (`const RIMG`) and code |
-| `service-worker.js` | Offline support: network-first for app files, cache-first for wiki images |
+| `index.html` | The app: styles, fish data (`const DATA`), reserve logos (`const RIMG`) and code |
+| `fish3d.js` | 3D fish models: body archetypes, per-species colours and markings, swim styles, and the viewer |
+| `vendor/three.module.min.js` | [Three.js](https://threejs.org/) r160 (MIT licence, see `vendor/three-LICENSE.txt`), loaded only when a fish page opens |
+| `service-worker.js` | Offline support and updates: app files open from the cache and refresh in the background; wiki images are cached once seen |
 | `manifest.webmanifest` | Install metadata and icons |
 | `icon-*.png`, `apple-touch-icon.png`, `favicon.ico`, `icon.svg` | App icons |
 
 ## Releasing
 
-Bump `V` in `service-worker.js` on every release so installed copies pick up the new version.
+1. Bump `V` in `service-worker.js` (e.g. `angler-guide-v3-1`). This is what makes installed copies show the update banner.
+2. Update `APP_VERSION` in `index.html` so Settings shows the right version.
+
+To tweak a species' 3D model, edit its entry in `SPECIES` in `fish3d.js` (colours, markings, or archetype overrides such as `H` for body depth).
 
 ## Credits
 
