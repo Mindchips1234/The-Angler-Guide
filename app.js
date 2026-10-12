@@ -55,7 +55,8 @@ function getLog(){
   return log;
 }
 const saveLog=l=>jset('log',l);
-const legendsCaught=()=>new Set(jget('legends',[]));
+const LEGENDS_TOTAL=15; // legendary fish in data/legendary.json
+const legendsCaught=()=>new Set(jget('legends',[]).filter(n=>n!=='Rubbert Ducky Junior'));
 const toggleLegend=n=>{const s=legendsCaught();s.has(n)?s.delete(n):s.add(n);jset('legends',[...s]);return s.has(n)};
 function bestFor(rn,fn,log=getLog()){ // best rank and heaviest weight logged for a fish
   let rank=null,w=null,any=false;
@@ -84,7 +85,7 @@ function buildHome(){
     <div class="eyebrow">Your fishing companion</div>
     <h1>Find your next<br>great catch.</h1>
     <p>Every reserve, fish, legendary, mission and piece of gear in <em>The Angler</em>, plus a log for everything you catch.</p>
-    <div class="stats"><span class="pill">🗺️ ${RESERVES.length} reserves</span><span class="pill">🐟 ${fishTotal} fish</span><span class="pill">👑 16 legendaries</span></div>
+    <div class="stats"><span class="pill">🗺️ ${RESERVES.length} reserves</span><span class="pill">🐟 ${fishTotal} fish</span><span class="pill">👑 ${LEGENDS_TOTAL} legendaries</span></div>
     <div class="homeActions"><button class="primaryAction" id="browseReserves">Browse reserves <span aria-hidden="true">→</span></button><button class="secondaryAction" id="randomFish">Surprise me with a fish</button></div>
   </section>
   <section class="homeSearch">
@@ -301,7 +302,7 @@ function buildLog(){
   const recent=log.slice().sort((a,b)=>(b.d||'').localeCompare(a.d||'')||String(b.id).localeCompare(String(a.id))).slice(0,30);
   const tile=(n,of,label,icon)=>`<div class="statTile"><span>${icon}</span><strong>${n}${of?`<small>/${of}</small>`:''}</strong><em>${label}</em></div>`;
   lv.innerHTML=`<div class="hero"><div class="eyebrow">Saved on this device</div><h1>My log</h1>
-    <div class="statTiles">${tile(species.size,total,'Fish caught','🐟')}${tile(dia,total,'Diamonds','💎')}${tile(legends.size,16,'Legendaries','👑')}${tile(log.length,0,'Catches logged','📒')}</div>
+    <div class="statTiles">${tile(species.size,total,'Fish caught','🐟')}${tile(dia,total,'Diamonds','💎')}${tile(legends.size,LEGENDS_TOTAL,'Legendaries','👑')}${tile(log.length,0,'Catches logged','📒')}</div>
     <div class="homeActions"><button class="primaryAction" id="lgNew">＋ Log a catch</button><button class="secondaryAction" id="lgBackup">Back up my log</button></div></div>
   <div class="section"><h2>Recent catches</h2>${recent.length?`<div class="logList">${recent.map(e=>{const d=DATA.reserves[e.r]?.records[e.f];if(!d)return'';
       return `<div class="logRow"><button class="logOpen" data-lo="${esc(e.r+'::'+e.f)}"><img src="${d.image}" alt="" loading="lazy" onerror="imgFail(this)"><span><strong>${esc(e.f)}</strong><small>${esc(e.r)}${e.d?' · '+esc(e.d):''}</small>${e.n?`<small class="muted">${esc(e.n)}</small>`:''}</span></button><span class="logMeta">${e.w!=null?`<b>${kgfmt(e.w)}</b>`:''}${rankBadge(e.rank)}</span><span class="logBtns"><button class="iconBtn" data-share="${esc(e.id)}" aria-label="Share this catch">⤴</button><button class="iconBtn" data-del="${esc(e.id)}" aria-label="Delete this catch">✕</button></span></div>`}).join('')}</div>`:'<div class="mutedBox">Nothing logged yet. Tap “Log a catch” after you land a fish, or use the button on any fish page.</div>'}</div>
@@ -372,7 +373,7 @@ async function buildGuides(){
   const md=jget('missions',{}),cd=jget('collect',{});
   const mTotal=Object.values(M).flat().reduce((a,g)=>a+g.missions.length,0),cTotal=Object.values(C).flat().reduce((a,g)=>a+g.items.length,0);
   const card=(href,icon,title,desc,done,total)=>`<a class="guideCard" href="#${href}"><span class="gIcon">${icon}</span><span><strong>${title}</strong><small>${desc}</small>${total?`<span class="bar"><i style="width:${done/total*100}%"></i></span><small class="muted">${done} of ${total} done</small>`:''}</span><span aria-hidden="true">→</span></a>`;
-  $('#guideCards').innerHTML=card('/guides/legendary','👑','Legendary fish','Story, bait, hooks and location map for all 16',legendsCaught().size,L.length||16)
+  $('#guideCards').innerHTML=card('/guides/legendary','👑','Legendary fish',`Story, bait, hooks and location map for all ${LEGENDS_TOTAL}`,legendsCaught().size,L.length||LEGENDS_TOTAL)
     +card('/guides/missions','📋','Missions',`${mTotal||'All'} missions with objectives and rewards, ready to tick off`,Object.keys(md).length,mTotal)
     +card('/guides/collectibles','🧭','Collectibles',`${cTotal||'All'} coins, figures, notes and more to find`,Object.keys(cd).length,cTotal)
     +card('/guides/gear','🎣','Gear guide','Rods, reels, lines and hooks, plus a setup helper for any fish')

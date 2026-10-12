@@ -30,6 +30,7 @@ RESERVES = {
     'kamuibetsu-national-park': 'Kamuibetsu National Park',
 }
 os.makedirs(CACHE, exist_ok=True); os.makedirs(OUT, exist_ok=True)
+EXCLUDE_LEGENDARY = {'Rubbert Ducky Junior'}  # left out of the app on purpose
 
 
 def get(url):
@@ -123,7 +124,7 @@ def legendary():
             'image': img_url(s.select_one('.ct-featured-image img')),
             'map': fig['href'] if fig else None, 'source': url,
         }
-    data = pmap(one, urls)
+    data = [d for d in pmap(one, urls) if d['name'] not in EXCLUDE_LEGENDARY]
     data.sort(key=lambda d: (list(RESERVES.values()).index(d['reserves'][0]) if d['reserves'] and d['reserves'][0] in RESERVES.values() else 9, d['name']))
     return data
 
