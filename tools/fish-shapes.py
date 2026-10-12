@@ -75,6 +75,21 @@ for f in sorted(glob.glob(os.path.join(src, '*.webp'))):
         idx = np.arange(W); ok = ~np.isnan(arr)
         return np.interp(xsamp, idx[ok], arr[ok])
     t_s, b_s = interp(top), interp(bot)
+    # Fins attached along the back and belly leave bumps that are narrow compared with the
+    # body's own curve; flatten bumps shorter than about 40% of the body (long catfish fins).
+    win = max(5, round(.38 * N))
+    t_s = ndi.grey_closing(t_s, size=win, mode='nearest')   # upward bumps (dorsal fins)
+    b_s = ndi.grey_opening(b_s, size=win, mode='nearest')   # downward bumps (belly fins)
+    # Behind its deepest point a body tapers smoothly to the tail base; anything hanging
+    # outside that taper (long anal fins running to the tail, second dorsal fins) is fin.
+    front = int(.55 * N); last = N - 1
+    ib = int(np.argmax(b_s[:front])); it = int(np.argmin(t_s[:front]))
+    for i in range(ib, N):
+        u = (i - ib) / max(1, last - ib); cap = b_s[last] + (b_s[ib] - b_s[last]) * np.cos(np.pi/2*u)**.8
+        b_s[i] = min(b_s[i], cap)
+    for i in range(it, N):
+        u = (i - it) / max(1, last - it); cap = t_s[last] - (t_s[last] - t_s[it]) * np.cos(np.pi/2*u)**.8
+        t_s[i] = max(t_s[i], cap)
     k = np.ones(5)/5
     t_s = np.convolve(np.pad(t_s, 2, mode='edge'), k, 'valid'); b_s = np.convolve(np.pad(b_s, 2, mode='edge'), k, 'valid')
     # Taper the very tip so the snout closes.

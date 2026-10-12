@@ -346,7 +346,8 @@ function buildTextured(P,S,tex,swimTo){
   const root=new THREE.Group(),W=S.w,H=S.h,k=2.45/W,cx=W/2,cy=H/2,X=px=>(cx-px)*k,Y=py=>(cy-py)*k;
   const ratio=Math.min(1.1,P.W/P.H),n=S.x.length,M=36,pos=[],uv=[],idx=[];
   const ring=(px,top,bot,t)=>{const mid=(top+bot)/2,r=(bot-top)/2;let w=r*ratio;if(P.flat&&t<.4)w*=1+P.flat*(1-t/.4)**2*1.1;
-    for(let j=0;j<=M;j++){const th=j/M*TAU,py=mid-r*Math.cos(th);pos.push(X(px),Y(py),w*Math.sin(th)*k);uv.push(px/W,py/H)}};
+    const ri=Math.max(0,r-Math.min(4,r*.15)); // sample a few pixels inside the outline, clear of the edge
+    for(let j=0;j<=M;j++){const th=j/M*TAU,c=Math.cos(th);pos.push(X(px),Y(mid-r*c),w*Math.sin(th)*k);uv.push(px/W,(mid-ri*c)/H)}};
   const m0=(S.t[0]+S.b[0])/2,m1=(S.t[n-1]+S.b[n-1])/2;
   ring(S.x[0]-1,m0,m0,0);
   for(let i=0;i<n;i++)ring(S.x[i],S.t[i],S.b[i],i/(n-1));
@@ -361,7 +362,9 @@ function buildTextured(P,S,tex,swimTo){
   const plane=new THREE.Mesh(pg,finMat);plane.renderOrder=-1;root.add(plane);
   const deform=[{geo:bg,normals:true},{geo:pg}];for(const d of deform)d.base=d.geo.attributes.position.array.slice();
   const field=swimField(P,X(S.x[0]),(W-S.x[0])*k),sp=P.swimP;
+  let bent=false;
   return{root,disposables:[bg,pg,bodyMat,finMat,tex],update(time,dt,playing){field.step(time,dt,playing);
+    if(!playing&&bent)return;bent=true;
     for(const d of deform){const a=d.geo.attributes.position,arr=a.array,b=d.base;for(let i=0;i<arr.length;i+=3)arr[i+2]=b[i+2]+field.lat(b[i]);a.needsUpdate=true;if(d.normals)d.geo.computeVertexNormals()}
     swimTo.position.y=sp.bob*Math.sin(time*.9);swimTo.rotation.z=(sp.tilt||0)+.03*Math.sin(time*.55);swimTo.rotation.y=.07*Math.sin(time*.3)}};
 }
@@ -432,25 +435,30 @@ export function mount(host,name){
   let renderer;try{renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true})}catch(e){host.innerHTML='<div class="m3dMsg">3D view needs WebGL, which this browser has turned off.</div>';return{dispose(){}}}
   host.innerHTML='';host.append(canvas);
   const ui=document.createElement('div');ui.className='m3dUi';ui.innerHTML='<button type="button" data-m3d="play" aria-label="Pause swimming">❚❚</button><button type="button" data-m3d="reset" aria-label="Reset view">↺</button>';host.append(ui);
-  const hint=document.createElement('div');hint.className='m3dHint';hint.textContent=matchMedia('(pointer: fine)').matches?'Drag to spin · Ctrl + scroll to zoom · double-click to reset':'Drag to spin · pinch to zoom';host.append(hint);
+  const hint=document.createElement('div');hint.className='m3dHint';hint.textContent='Loading model…';host.append(hint);
+  canvas.tabIndex=0;canvas.setAttribute('role','img');canvas.setAttribute('aria-label',`3D model of ${name}. Use the arrow keys to spin it and + or − to zoom.`);
   renderer.setPixelRatio(Math.min(2,devicePixelRatio||1));
   const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(32,1,.1,50);
   scene.add(new THREE.HemisphereLight('#d8f4ff','#22342e',1.9));
   const key=new THREE.DirectionalLight('#ffffff',2.2);key.position.set(2,4,3);scene.add(key);
   const rim=new THREE.DirectionalLight('#7fe0c8',1.1);rim.position.set(-3,1.5,-2.5);scene.add(rim);
   const view=new THREE.Group(),swim=new THREE.Group();view.add(swim);scene.add(view);
-  let model=null,gone=false;const use=m=>{if(gone){for(const d of m.disposables)d.dispose&&d.dispose();return}model=m;swim.add(m.root);host.classList.add('m3dReady')};
+  let model=null,gone=false,ext={r:1.3,h:.75};
+  const use=(m,kind)=>{host.dataset.model=kind;if(gone){for(const d of m.disposables)d.dispose&&d.dispose();return}model=m;swim.add(m.root);
+    m.update(0,0,false);const box=new THREE.Box3().setFromObject(m.root);
+    ext={r:Math.max(Math.abs(box.min.x),Math.abs(box.max.x),Math.abs(box.min.z),Math.abs(box.max.z)),h:Math.max(Math.abs(box.min.y),Math.abs(box.max.y))};resize();
+    hint.textContent=matchMedia('(pointer: fine)').matches?'Drag to spin · Ctrl + scroll to zoom · double-click to reset':'Drag to spin · pinch to zoom';host.classList.add('m3dReady')};
   const slug=name.replace(/[^A-Za-z0-9]+/g,'-').replace(/-+$/,''),S=SHAPES[slug];
-  if(crust||!S)use(P.crab?buildCrab(P):P.crayfish?buildCrayfish(P):buildFish(P,name,swim));
-  else new THREE.TextureLoader().load('./fish-tex/'+slug+'.webp',tex=>{tex.colorSpace=THREE.SRGBColorSpace;tex.flipY=false;tex.anisotropy=renderer.capabilities.getMaxAnisotropy();use(buildTextured(P,S,tex,swim))},undefined,()=>use(buildFish(P,name,swim)));
+  const start=()=>{if(crust||!S)use(P.crab?buildCrab(P):P.crayfish?buildCrayfish(P):buildFish(P,name,swim),'built');
+  else new THREE.TextureLoader().load('./fish-tex/'+slug+'.webp',tex=>{tex.colorSpace=THREE.SRGBColorSpace;tex.flipY=false;tex.anisotropy=renderer.capabilities.getMaxAnisotropy();use(buildTextured(P,S,tex,swim),'picture')},undefined,()=>use(buildFish(P,name,swim),'generated'))};
   // Drifting specks for an underwater feel.
   const pg=new THREE.BufferGeometry(),pp=[];for(let i=0;i<160;i++)pp.push((Math.random()-.5)*7,(Math.random()-.5)*4,(Math.random()-.5)*4-1);
   pg.setAttribute('position',new THREE.Float32BufferAttribute(pp,3));const pm=new THREE.PointsMaterial({color:'#bfeee0',size:.025,transparent:true,opacity:.45,depthWrite:false});
   const specks=new THREE.Points(pg,pm);scene.add(specks);
   const rest={yaw:crust?-.7:Math.PI+.4,pitch:crust?.62:.16,zoom:1};let yaw=rest.yaw,pitch=rest.pitch,zoom=1,fit=4,vy=0,idle=0,playing=true,visible=true,raf=0,last=0;
   const resize=()=>{const w=host.clientWidth,h=host.clientHeight;if(!w||!h)return;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();
-    const tn=Math.tan(THREE.MathUtils.degToRad(camera.fov/2));fit=Math.max(1.55/(tn*camera.aspect),(crust?.95:.75)/tn)};
-  const ro=new ResizeObserver(resize);ro.observe(host);resize();
+    const tn=Math.tan(THREE.MathUtils.degToRad(camera.fov/2));fit=Math.max(ext.r*1.18/(tn*camera.aspect),(ext.h*1.25+.08)/tn)};
+  const ro=new ResizeObserver(resize);ro.observe(host);resize();start();
   const pts=new Map();let pinch0=0,zoom0=1;
   canvas.addEventListener('pointerdown',e=>{canvas.setPointerCapture(e.pointerId);pts.set(e.pointerId,[e.clientX,e.clientY]);vy=0;idle=0;
     if(pts.size===2){const [a,b]=[...pts.values()];pinch0=Math.hypot(a[0]-b[0],a[1]-b[1]);zoom0=zoom}});
@@ -459,7 +467,10 @@ export function mount(host,name){
     else if(pts.size===2&&pinch0){const [a,b]=[...pts.values()];zoom=Math.max(.45,Math.min(1.8,zoom0*pinch0/Math.hypot(a[0]-b[0],a[1]-b[1])))}idle=0});
   const up=e=>{pts.delete(e.pointerId);if(pts.size<2)pinch0=0};canvas.addEventListener('pointerup',up);canvas.addEventListener('pointercancel',up);
   canvas.addEventListener('wheel',e=>{if(!(e.ctrlKey||e.metaKey))return;e.preventDefault();zoom=Math.max(.45,Math.min(1.8,zoom*(e.deltaY>0?1.08:.93)))},{passive:false});
-  const reset=()=>{yaw=rest.yaw;pitch=rest.pitch;zoom=1;vy=0};canvas.addEventListener('dblclick',reset);
+  const reset=()=>{yaw=rest.yaw;pitch=rest.pitch;zoom=1;vy=0;idle=0};canvas.addEventListener('dblclick',reset);
+  canvas.addEventListener('keydown',e=>{const k=e.key;idle=0;
+    if(k==='ArrowLeft')yaw-=.2;else if(k==='ArrowRight')yaw+=.2;else if(k==='ArrowUp')pitch=Math.max(-.9,pitch-.15);else if(k==='ArrowDown')pitch=Math.min(.9,pitch+.15);
+    else if(k==='+'||k==='=')zoom=Math.max(.45,zoom*.9);else if(k==='-')zoom=Math.min(1.8,zoom*1.1);else if(k==='0'||k==='Home')reset();else return;e.preventDefault()});
   ui.addEventListener('click',e=>{const b=e.target.closest('[data-m3d]');if(!b)return;
     if(b.dataset.m3d==='reset')reset()
     else{playing=!playing;b.textContent=playing?'❚❚':'▶';b.setAttribute('aria-label',playing?'Pause swimming':'Play swimming')}});
