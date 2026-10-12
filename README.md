@@ -16,7 +16,7 @@ python3 -m http.server 8000   # then open http://localhost:8000
 ## Features
 
 - **App feel** – intro animation on launch (tap to skip), bottom tab bar on phones (Home, Reserves, Catches, Settings), sliding screen transitions, swipe from the left edge to go back in the installed app, and a settings bottom sheet.
-- **3D fish models** – every species has a 3D model you can spin (drag), zoom (pinch, or Ctrl + scroll) and pause. Each fish is shaped from the outline of its wiki picture and wrapped in that picture, so it looks like the game's fish from every angle. Each swims the way that fish does: eels wriggle, trout and bass beat their tails, catfish glide, pike hover then dart, sunfish scull with their side fins. The crab scuttles and the crayfish flicks its tail.
+- **3D fish models** – tap the picture on any fish page to open its 3D model in a pop-up. Spin it (drag), zoom (pinch, or Ctrl + scroll) and pause it. Each fish is shaped from the outline of its wiki picture and wrapped in that picture, so it looks like the game's fish from every angle. Each swims the way that fish does: eels wriggle, trout and bass beat their tails, catfish glide, pike hover then dart, sunfish scull with their side fins. The crab scuttles and the crayfish flicks its tail.
 - **My catches** – a dedicated screen with progress per reserve and every fish you've marked as caught.
 - **Home screen** – search every reserve for a fish, filter by reserve, or jump to a random fish.
 - **Reserve pages** – interactive map with per-fish hotspot overlays (drag, pinch or +/− to zoom) and a fish list filterable by time, temperature, bait and habitat.
