@@ -23,7 +23,7 @@ Five tabs on phones (header buttons on larger screens):
 | --- | --- |
 | **Home** | Search every fish, **What's biting?** (pick a reserve, time of day, water temperature and bait; it ranks the fish most likely to bite), and the reserve list |
 | **Reserves** | Interactive map with hotspot overlays, the reserve's legendary fish, and a filterable fish list. Each fish page has bait preferences, traits, a hotspot map, a **rank table with the weight range and hook size for every rank**, the 3D model (tap the picture) and a **Log a catch** button |
-| **Log** | Your catches with weight, rank (worked out from the weight), score and date (a weight above the fish's maximum is flagged as invalid); fish caught, Diamonds and legendaries counters; a collection of every fish showing your best rank and personal best; share any catch as a picture |
+| **Log** | Your catches with weight, rank (worked out from the weight), score and date (enter the weight in kg, g, lb or oz; a weight above the fish's maximum is flagged as invalid); fish caught, Diamonds and legendaries counters; a collection of every fish showing your best rank and personal best; share any catch as a picture |
 | **Guides** | **Legendary fish** (story, bait, traits, hooks and location map, with a caught tracker), **Missions** and **Collectibles** (tick-off lists per reserve, missions with objectives and rewards), **Gear guide** (every rod, reel, line and hook, plus a setup helper that suggests hooks, line and rods for any fish and rank), and links to the community records hub and the wiki |
 | **Settings** | Metric/imperial, °C/°F, dark/light/match-device theme, back up and restore your progress, replay the intro |
 

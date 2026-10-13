@@ -273,17 +273,22 @@ const logDlg=$('#logDlg');
 function openLogSheet(rn,fn){
   rn=rn||store.get('logReserve',R||RESERVES[0]);
   $('#lgReserve').innerHTML=opts(RESERVES,rn);fillLogFish(fn);
-  $('#lgWeight').value='';$('#lgScore').value='';$('#lgUnit').textContent=unit==='metric'?'kg':'lb';$('#lgDate').value=today();$('#lgNote').value='';$('#lgRank').value='';
+  $('#lgWeight').value='';$('#lgScore').value='';$('#lgWUnit').value=store.get('logWUnit',unit==='metric'?'kg':'lb');$('#lgDate').value=today();$('#lgNote').value='';$('#lgRank').value='';
   updateLogRank();logDlg.showModal();setTimeout(()=>$('#lgWeight').focus(),60);
 }
 function fillLogFish(fn){const rn=$('#lgReserve').value,fish=DATA.reserves[rn].fish;$('#lgFish').innerHTML=opts(fish,fn&&fish.includes(fn)?fn:fish[0]);updateLogRank()}
-function logWeightKg(){const v=parseFloat(String($('#lgWeight').value).replace(',','.'));return isNaN(v)||v<=0?null:(unit==='metric'?v:v/2.20462)}
+// Weight units in the log sheet: kilograms per unit, and how many decimals to show.
+const W_UNITS={kg:[1,2],g:[.001,0],lb:[1/2.20462,2],oz:[1/35.274,1]};
+const wUnit=()=>W_UNITS[$('#lgWUnit').value]?$('#lgWUnit').value:'kg';
+const inUnit=(kg,u)=>+(kg/W_UNITS[u][0]).toFixed(W_UNITS[u][1]),fmtIn=(kg,u)=>inUnit(kg,u)+' '+u;
+function logWeightKg(){const v=parseFloat(String($('#lgWeight').value).replace(',','.'));return isNaN(v)||v<=0?null:v*W_UNITS[wUnit()][0]}
 // Live checks for the log sheet. Returns an error message for the weight, or '' when it's fine.
 function weightError(){
   const raw=String($('#lgWeight').value).trim();if(raw==='')return '';
   const v=parseFloat(raw.replace(',','.'));if(isNaN(v)||v<=0)return 'Invalid weight: enter a number above 0.';
-  const rn=$('#lgReserve').value,fn=$('#lgFish').value,max=maxKgFor(rn,fn),kg=logWeightKg();
-  return max!=null&&kg>max*1.001+1e-6?`Invalid weight: a ${fn} can't weigh more than ${kgfmt(max)}.`:'';
+  const rn=$('#lgReserve').value,fn=$('#lgFish').value,max=maxKgFor(rn,fn),u=wUnit();
+  // Compared in the chosen unit, rounded the same way as the message, so typing the maximum shown is accepted.
+  return max!=null&&v>inUnit(max,u)?`Invalid weight: a ${fn} can't weigh more than ${fmtIn(max,u)}.`:'';
 }
 function scoreValue(){const raw=String($('#lgScore').value).trim();if(raw==='')return{v:null,err:''};const v=Number(raw);
   return Number.isInteger(v)&&v>=0?{v,err:''}:{v:null,err:'Invalid score: enter a whole number of points (0 or more).'}}
@@ -293,10 +298,10 @@ function updateLogRank(){
   showFieldError('#lgError',$('#lgWeight'),werr);showFieldError('#lgScoreError',$('#lgScore'),scoreValue().err);
   $('#lgAuto').innerHTML=werr?'':auto?`Rank from weight: ${rankBadge(auto)}`:'Enter a weight to work out the rank, or pick it below.';
   $('#lgRankWrap').hidden=!!auto||!!werr;
-  const max=(d.ranks||[]).slice(-1)[0];$('#lgHint').textContent=max?`${fn}: ${kgfmt(d.ranks[0].min)} to ${kgfmt(max.max)}. Diamond from ${kgfmt(max.min)}.`:'';
+  const max=(d.ranks||[]).slice(-1)[0];const u=wUnit();$('#lgHint').textContent=max?`${fn}: ${fmtIn(d.ranks[0].min,u)} to ${fmtIn(max.max,u)}. Diamond from ${fmtIn(max.min,u)}.`:'';
 }
 logDlg.addEventListener('input',e=>{if(e.target.id==='lgWeight'||e.target.id==='lgScore')updateLogRank()});
-logDlg.addEventListener('change',e=>{if(e.target.id==='lgReserve')fillLogFish();if(e.target.id==='lgFish')updateLogRank()});
+logDlg.addEventListener('change',e=>{if(e.target.id==='lgReserve')fillLogFish();if(e.target.id==='lgFish')updateLogRank();if(e.target.id==='lgWUnit'){store.set('logWUnit',e.target.value);updateLogRank()}});
 logDlg.addEventListener('click',e=>{if(e.target.closest('#lgCancel'))logDlg.close()});
 $('#logForm').addEventListener('submit',e=>{
   e.preventDefault();
