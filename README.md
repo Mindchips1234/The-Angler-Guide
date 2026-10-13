@@ -1,4 +1,4 @@
-# Angler Guide 3.1
+# Angler Guide 3.2
 
 A fan-made, offline-ready field guide for the game *The Angler*, made by Vanderholst Studios. It covers all five reserves, 96 fish entries (84 species), 15 legendary fish, 313 missions, 247 collectibles and 175 pieces of gear, with a 3D model of every species and a log for everything you catch.
 
@@ -40,7 +40,7 @@ Also: an intro animation on launch (tap to skip), sliding screen transitions, sw
 | `data/fish-data.js` | Fish and reserve data (`DATA`) and reserve logos (`RIMG`) |
 | `data/legendary.json`, `missions.json`, `collectibles.json`, `gear.json` | Guide data, loaded when a guide opens |
 | `img/` | Every fish picture, reserve map, hotspot map, logo and legendary picture/map (WebP) |
-| `fish3d.js` | 3D models: builds each fish from its outline and texture, swim styles, the crab and crayfish models, and the viewer |
+| `fish3d.js` | 3D models: builds each fish from its outline and texture, swim styles, the jointed crab and crayfish models (walking legs, working pincers, tail flick), and the viewer |
 | `fish-shapes.js`, `fish-tex/` | Traced body outlines and cut-out textures for the 82 fish |
 | `vendor/three.module.min.js` | [Three.js](https://threejs.org/) r160 (MIT licence, see `vendor/three-LICENSE.txt`), loaded for the 3D models |
 | `service-worker.js` | Offline support and updates: app files open from the cache and refresh in the background; pictures and maps are cached once seen |
