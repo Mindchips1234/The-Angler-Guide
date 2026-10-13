@@ -37,6 +37,10 @@ function rankFor(rn,fn,kg){
   const rs=(DATA.reserves[rn]?.records[fn]?.ranks)||[];if(kg==null||!rs.length)return null;
   let best=rs[0].rank;for(const r of rs)if(r.min!=null&&kg>r.min-1e-9)best=r.rank;return best;
 }
+// Heaviest weight a fish can reach (top of its Diamond range), used to reject impossible catches.
+function maxKgFor(rn,fn){const d=DATA.reserves[rn]?.records[fn];if(!d)return null;const rs=d.ranks||[];
+  if(rs.length&&rs[rs.length-1].max!=null)return rs[rs.length-1].max;
+  const m=[...String(d.weight||'').matchAll(/([\d.]+)\s*(kg|g)\b/g)].pop();return m?(m[2]==='g'?+m[1]/1000:+m[1]):null}
 const HOOK_NOT_SOLD=new Set(['5/0','6/0','7/0','8/0','9/0','10/0']);
 
 // ---------------------------------------------------------------- guide data (loaded on demand)
@@ -59,9 +63,9 @@ const LEGENDS_TOTAL=15; // legendary fish in data/legendary.json
 const legendsCaught=()=>new Set(jget('legends',[]).filter(n=>n!=='Rubbert Ducky Junior'));
 const toggleLegend=n=>{const s=legendsCaught();s.has(n)?s.delete(n):s.add(n);jset('legends',[...s]);return s.has(n)};
 function bestFor(rn,fn,log=getLog()){ // best rank and heaviest weight logged for a fish
-  let rank=null,w=null,any=false;
-  for(const e of log)if(e.r===rn&&e.f===fn){any=true;if(e.rank&&(rank==null||RANKS.indexOf(e.rank)>RANKS.indexOf(rank)))rank=e.rank;if(e.w!=null&&(w==null||e.w>w))w=e.w}
-  return any?{rank,w}:null;
+  let rank=null,w=null,s=null,any=false;
+  for(const e of log)if(e.r===rn&&e.f===fn){any=true;if(e.s!=null&&(s==null||e.s>s))s=e.s;if(e.rank&&(rank==null||RANKS.indexOf(e.rank)>RANKS.indexOf(rank)))rank=e.rank;if(e.w!=null&&(w==null||e.w>w))w=e.w}
+  return any?{rank,w,s}:null;
 }
 
 // ---------------------------------------------------------------- zoomable map
@@ -209,7 +213,7 @@ function fishDyn(f){
   const ranks=d.ranks||(d.hookRanks||[]).map(x=>({rank:x.rank,hooks:x.hooks})),lg=(DATA.legendaryHooks[R]||{})[f]||{};let unsold=false;
   const hooks=h=>h.length?h.map(x=>HOOK_NOT_SOLD.has(x)?(unsold=true,esc(x)+'*'):esc(x)).join(', '):'—';
   $('#franks').innerHTML=`<table class="hooks"><thead><tr><th>Rank</th><th>Weight</th><th>Hook</th></tr></thead><tbody>${ranks.map(x=>`<tr><td>${rankBadge(x.rank)}</td><td>${x.min!=null?`${kgfmt(x.min)} – ${kgfmt(x.max)}`:'—'}</td><td>${hooks(x.hooks)}</td></tr>`).join('')}${Object.entries(lg).map(([n,h])=>`<tr class="legendary-row"><td>${rankBadge('Legendary')}</td><td><a href="#/guides/legendary/${encodeURIComponent(n)}">${esc(n)}</a></td><td>${hooks(h)}</td></tr>`).join('')}</tbody></table>${unsold?'<div class="note">* Hook sizes above 4/0 are listed by the wiki but not sold in the shop.</div>':''}`;
-  const b=bestFor(R,f);$('#fbest').innerHTML=b?`Your best: ${b.rank?rankBadge(b.rank):'caught'}${b.w!=null?' · '+kgfmt(b.w):''}`:'';
+  const b=bestFor(R,f);$('#fbest').innerHTML=b?`Your best: ${b.rank?rankBadge(b.rank):'caught'}${b.w!=null?' · '+kgfmt(b.w):''}${b.s!=null?' · ⭐ '+b.s.toLocaleString()+' pts':''}`:'';
 }
 function fishPage(f){
   const r=DATA.reserves[R],d=r.records[f],key=R+'/'+f;rv.hidden=true;fv.hidden=false;
@@ -269,24 +273,37 @@ const logDlg=$('#logDlg');
 function openLogSheet(rn,fn){
   rn=rn||store.get('logReserve',R||RESERVES[0]);
   $('#lgReserve').innerHTML=opts(RESERVES,rn);fillLogFish(fn);
-  $('#lgWeight').value='';$('#lgUnit').textContent=unit==='metric'?'kg':'lb';$('#lgDate').value=today();$('#lgNote').value='';$('#lgRank').value='';
+  $('#lgWeight').value='';$('#lgScore').value='';$('#lgUnit').textContent=unit==='metric'?'kg':'lb';$('#lgDate').value=today();$('#lgNote').value='';$('#lgRank').value='';
   updateLogRank();logDlg.showModal();setTimeout(()=>$('#lgWeight').focus(),60);
 }
 function fillLogFish(fn){const rn=$('#lgReserve').value,fish=DATA.reserves[rn].fish;$('#lgFish').innerHTML=opts(fish,fn&&fish.includes(fn)?fn:fish[0]);updateLogRank()}
 function logWeightKg(){const v=parseFloat(String($('#lgWeight').value).replace(',','.'));return isNaN(v)||v<=0?null:(unit==='metric'?v:v/2.20462)}
+// Live checks for the log sheet. Returns an error message for the weight, or '' when it's fine.
+function weightError(){
+  const raw=String($('#lgWeight').value).trim();if(raw==='')return '';
+  const v=parseFloat(raw.replace(',','.'));if(isNaN(v)||v<=0)return 'Invalid weight: enter a number above 0.';
+  const rn=$('#lgReserve').value,fn=$('#lgFish').value,max=maxKgFor(rn,fn),kg=logWeightKg();
+  return max!=null&&kg>max*1.001+1e-6?`Invalid weight: a ${fn} can't weigh more than ${kgfmt(max)}.`:'';
+}
+function scoreValue(){const raw=String($('#lgScore').value).trim();if(raw==='')return{v:null,err:''};const v=Number(raw);
+  return Number.isInteger(v)&&v>=0?{v,err:''}:{v:null,err:'Invalid score: enter a whole number of points (0 or more).'}}
+function showFieldError(id,input,msg){const el=$(id);el.textContent=msg;el.hidden=!msg;input.setAttribute('aria-invalid',msg?'true':'false')}
 function updateLogRank(){
-  const rn=$('#lgReserve').value,fn=$('#lgFish').value,kg=logWeightKg(),auto=rankFor(rn,fn,kg),d=DATA.reserves[rn].records[fn];
-  $('#lgAuto').innerHTML=auto?`Rank from weight: ${rankBadge(auto)}`:'Enter a weight to work out the rank, or pick it below.';
-  $('#lgRankWrap').hidden=!!auto;
+  const rn=$('#lgReserve').value,fn=$('#lgFish').value,werr=weightError(),kg=werr?null:logWeightKg(),auto=rankFor(rn,fn,kg),d=DATA.reserves[rn].records[fn];
+  showFieldError('#lgError',$('#lgWeight'),werr);showFieldError('#lgScoreError',$('#lgScore'),scoreValue().err);
+  $('#lgAuto').innerHTML=werr?'':auto?`Rank from weight: ${rankBadge(auto)}`:'Enter a weight to work out the rank, or pick it below.';
+  $('#lgRankWrap').hidden=!!auto||!!werr;
   const max=(d.ranks||[]).slice(-1)[0];$('#lgHint').textContent=max?`${fn}: ${kgfmt(d.ranks[0].min)} to ${kgfmt(max.max)}. Diamond from ${kgfmt(max.min)}.`:'';
 }
-logDlg.addEventListener('input',e=>{if(e.target.id==='lgWeight')updateLogRank()});
+logDlg.addEventListener('input',e=>{if(e.target.id==='lgWeight'||e.target.id==='lgScore')updateLogRank()});
 logDlg.addEventListener('change',e=>{if(e.target.id==='lgReserve')fillLogFish();if(e.target.id==='lgFish')updateLogRank()});
 logDlg.addEventListener('click',e=>{if(e.target.closest('#lgCancel'))logDlg.close()});
 $('#logForm').addEventListener('submit',e=>{
   e.preventDefault();
+  updateLogRank();const werr=weightError(),sc=scoreValue();
+  if(werr||sc.err){haptic([30,40,30]);(werr?$('#lgWeight'):$('#lgScore')).focus();return}
   const rn=$('#lgReserve').value,fn=$('#lgFish').value,kg=logWeightKg(),rank=rankFor(rn,fn,kg)||$('#lgRank').value||null;
-  const log=getLog(),prev=bestFor(rn,fn,log),entry={id:Date.now().toString(36),r:rn,f:fn,w:kg==null?null:+kg.toFixed(3),rank,d:$('#lgDate').value||today(),n:$('#lgNote').value.trim()};
+  const log=getLog(),prev=bestFor(rn,fn,log),entry={id:Date.now().toString(36),r:rn,f:fn,w:kg==null?null:+kg.toFixed(3),rank,s:sc.v,d:$('#lgDate').value||today(),n:$('#lgNote').value.trim()};
   log.push(entry);saveLog(log);store.set('logReserve',rn);logDlg.close();
   const pb=kg!=null&&(!prev||prev.w==null||kg>prev.w)&&prev;
   haptic(rank==='Diamond'?[20,40,20]:15);
@@ -305,7 +322,7 @@ function buildLog(){
     <div class="statTiles">${tile(species.size,total,'Fish caught','🐟')}${tile(dia,total,'Diamonds','💎')}${tile(legends.size,LEGENDS_TOTAL,'Legendaries','👑')}${tile(log.length,0,'Catches logged','📒')}</div>
     <div class="homeActions"><button class="primaryAction" id="lgNew">＋ Log a catch</button><button class="secondaryAction" id="lgBackup">Back up my log</button></div></div>
   <div class="section"><h2>Recent catches</h2>${recent.length?`<div class="logList">${recent.map(e=>{const d=DATA.reserves[e.r]?.records[e.f];if(!d)return'';
-      return `<div class="logRow"><button class="logOpen" data-lo="${esc(e.r+'::'+e.f)}"><img src="${d.image}" alt="" loading="lazy" onerror="imgFail(this)"><span><strong>${esc(e.f)}</strong><small>${esc(e.r)}${e.d?' · '+esc(e.d):''}</small>${e.n?`<small class="muted">${esc(e.n)}</small>`:''}</span></button><span class="logMeta">${e.w!=null?`<b>${kgfmt(e.w)}</b>`:''}${rankBadge(e.rank)}</span><span class="logBtns"><button class="iconBtn" data-share="${esc(e.id)}" aria-label="Share this catch">⤴</button><button class="iconBtn" data-del="${esc(e.id)}" aria-label="Delete this catch">✕</button></span></div>`}).join('')}</div>`:'<div class="mutedBox">Nothing logged yet. Tap “Log a catch” after you land a fish, or use the button on any fish page.</div>'}</div>
+      return `<div class="logRow"><button class="logOpen" data-lo="${esc(e.r+'::'+e.f)}"><img src="${d.image}" alt="" loading="lazy" onerror="imgFail(this)"><span><strong>${esc(e.f)}</strong><small>${esc(e.r)}${e.d?' · '+esc(e.d):''}</small>${e.n?`<small class="muted">${esc(e.n)}</small>`:''}</span></button><span class="logMeta">${e.w!=null?`<b>${kgfmt(e.w)}</b>`:''}${rankBadge(e.rank)}${e.s!=null?`<span class="logScore">⭐ ${e.s.toLocaleString()} pts</span>`:''}</span><span class="logBtns"><button class="iconBtn" data-share="${esc(e.id)}" aria-label="Share this catch">⤴</button><button class="iconBtn" data-del="${esc(e.id)}" aria-label="Delete this catch">✕</button></span></div>`}).join('')}</div>`:'<div class="mutedBox">Nothing logged yet. Tap “Log a catch” after you land a fish, or use the button on any fish page.</div>'}</div>
   <div class="section"><h2>Collection</h2><p class="note">Your best rank for every fish. Tap one to open its guide.</p>
     <div class="chipRow" id="lgReserveChips"><button class="chip${lr?'':' active'}" data-lr="">All</button>${RESERVES.map(n=>`<button class="chip${lr===n?' active':''}" data-lr="${esc(n)}">${esc(n.replace(/ (Reserve|Nature Reserve|National Park|Municipio)$/,''))}</button>`).join('')}</div>
     <div class="chipRow">${[['all','All'],['caught','Caught'],['missing','Not caught'],['diamond','💎 Diamond'],['nodiamond','No Diamond yet']].map(([k,l])=>`<button class="chip small${lf===k?' active':''}" data-lf="${k}">${l}</button>`).join('')}</div>
@@ -338,6 +355,7 @@ async function shareCatch(e){
   g.fillStyle='#9bb0ad';g.font='500 40px system-ui,sans-serif';g.fillText(e.r+(e.d?'  ·  '+e.d:''),60,870,W-120);
   if(e.rank){g.fillStyle={Diamond:'#8fe3ff',Gold:'#e5c96e',Silver:'#d5dde3',Bronze:'#d39a62',Juvenile:'#9bb0ad'}[e.rank]||'#fff';g.font='800 96px system-ui,sans-serif';g.fillText((RANK_ICON[e.rank]||'')+' '+e.rank,60,1040)}
   if(e.w!=null){g.fillStyle='#edf7f3';g.font='800 120px system-ui,sans-serif';g.fillText(kgfmt(e.w),60,e.rank?1180:1060)}
+  if(e.s!=null){g.fillStyle='#e5c96e';g.font='700 52px system-ui,sans-serif';g.textAlign='right';g.fillText('⭐ '+e.s.toLocaleString()+' pts',W-60,e.w!=null?(e.rank?1180:1060):(e.rank?1180:1040));g.textAlign='left'}
   g.fillStyle='#5d7472';g.font='500 30px system-ui,sans-serif';g.fillText('Call of the Wild: The Angler · Vanderholst Studios',60,H-60);
   const blob=await new Promise(res=>c.toBlob(res,'image/png'));if(!blob)return toast('Could not make the picture.');
   const file=new File([blob],(e.f+'-'+(e.d||'catch')).replace(/[^\w-]+/g,'-')+'.png',{type:'image/png'});
