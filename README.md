@@ -1,4 +1,4 @@
-# Angler Guide 3.1
+# Angler Guide 3.2
 
 A fan-made, offline-ready field guide for the game *The Angler*, made by Vanderholst Studios. It covers all five reserves, 96 fish entries (84 species), 15 legendary fish, 313 missions, 247 collectibles and 175 pieces of gear, with a 3D model of every species and a log for everything you catch.
 
@@ -23,7 +23,7 @@ Five tabs on phones (header buttons on larger screens):
 | --- | --- |
 | **Home** | Search every fish, **What's biting?** (pick a reserve, time of day, water temperature and bait; it ranks the fish most likely to bite), and the reserve list |
 | **Reserves** | Interactive map with hotspot overlays, the reserve's legendary fish, and a filterable fish list. Each fish page has bait preferences, traits, a hotspot map, a **rank table with the weight range and hook size for every rank**, the 3D model (tap the picture) and a **Log a catch** button |
-| **Log** | Your catches with weight, rank (worked out from the weight) and date; fish caught, Diamonds and legendaries counters; a collection of every fish showing your best rank and personal best; share any catch as a picture |
+| **Log** | Your catches with weight, rank (worked out from the weight), score and date (enter the weight in kg, g, lb or oz; a weight above the fish's maximum is flagged as invalid); fish caught, Diamonds and legendaries counters; a collection of every fish showing your best rank and personal best; share any catch as a picture |
 | **Guides** | **Legendary fish** (story, bait, traits, hooks and location map, with a caught tracker), **Missions** and **Collectibles** (tick-off lists per reserve, missions with objectives and rewards), **Gear guide** (every rod, reel, line and hook, plus a setup helper that suggests hooks, line and rods for any fish and rank), and links to the community records hub and the wiki |
 | **Settings** | Metric/imperial, °C/°F, dark/light/match-device theme, back up and restore your progress, replay the intro |
 
@@ -40,7 +40,7 @@ Also: an intro animation on launch (tap to skip), sliding screen transitions, sw
 | `data/fish-data.js` | Fish and reserve data (`DATA`) and reserve logos (`RIMG`) |
 | `data/legendary.json`, `missions.json`, `collectibles.json`, `gear.json` | Guide data, loaded when a guide opens |
 | `img/` | Every fish picture, reserve map, hotspot map, logo and legendary picture/map (WebP) |
-| `fish3d.js` | 3D models: builds each fish from its outline and texture, swim styles, the crab and crayfish models, and the viewer |
+| `fish3d.js` | 3D models: builds each fish from its outline and texture, swim styles, the jointed crab and crayfish models (walking legs, working pincers, tail flick), and the viewer |
 | `fish-shapes.js`, `fish-tex/` | Traced body outlines and cut-out textures for the 82 fish |
 | `vendor/three.module.min.js` | [Three.js](https://threejs.org/) r160 (MIT licence, see `vendor/three-LICENSE.txt`), loaded for the 3D models |
 | `service-worker.js` | Offline support and updates: app files open from the cache and refresh in the background; pictures and maps are cached once seen |

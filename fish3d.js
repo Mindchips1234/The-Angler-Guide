@@ -370,63 +370,160 @@ function buildTextured(P,S,tex,swimTo){
 }
 
 // ---------------------------------------------------------------- crustaceans
-function limb(mat,len,r){const g=new THREE.CylinderGeometry(r*.8,r,len,8);g.translate(0,-len/2,0);return new THREE.Mesh(g,mat)}
-function buildCrab(P){
-  const root=new THREE.Group(),dis=[],[shell,leg,under,claw]=P.c;
-  const mS=new THREE.MeshStandardMaterial({color:shell,roughness:.45,metalness:.08}),mL=new THREE.MeshStandardMaterial({color:leg,roughness:.5}),mU=new THREE.MeshStandardMaterial({color:under,roughness:.6}),mC=new THREE.MeshStandardMaterial({color:claw,roughness:.45});dis.push(mS,mL,mU,mC);
-  const body=new THREE.Mesh(new THREE.SphereGeometry(.5,32,20),mS);body.scale.set(1.25,.42,1.05);root.add(body);
-  const belly=new THREE.Mesh(new THREE.SphereGeometry(.48,24,12,0,TAU,Math.PI/2,Math.PI/2),mU);belly.scale.set(1.18,.3,1);root.add(belly);
-  for(const s of[1,-1]){const st=limb(mL,.14,.025);st.position.set(.5,.12,s*.14);st.rotation.z=Math.PI;root.add(st);
-    const e=new THREE.Mesh(new THREE.SphereGeometry(.045,12,10),new THREE.MeshStandardMaterial({color:'#111',roughness:.1}));e.position.set(.5,.27,s*.14);root.add(e);dis.push(e.geometry,e.material,st.geometry)}
-  const legs=[],claws=[];
-  for(const s of[1,-1]){
-    for(let i=0;i<4;i++){const hip=new THREE.Group(),a=limb(mL,.42,.038),knee=new THREE.Group(),b=limb(mL,.5,.028);
-      hip.position.set(.25-i*.2,0,s*.45);a.rotation.x=s*-1.2;hip.add(a);knee.position.set(0,-Math.cos(1.2)*.42,s*Math.sin(1.2)*.42);b.rotation.x=s*-.45;knee.add(b);hip.add(knee);
-      hip.rotation.y=s*(.35-i*.25);root.add(hip);legs.push({hip,knee,s,i,y0:hip.rotation.y});dis.push(a.geometry,b.geometry)}
-    const big=s>0?1.35:1,arm=new THREE.Group(),up=limb(mL,.35,.06),palm=new THREE.Mesh(new THREE.SphereGeometry(.16*big,16,12),mC),fin=new THREE.Group(),f1=new THREE.Mesh(new THREE.ConeGeometry(.05*big,.26*big,8),mC),f2=new THREE.Mesh(new THREE.ConeGeometry(.045*big,.24*big,8),mC);
-    arm.position.set(.5,0,s*.32);up.rotation.z=Math.PI/2+.3;up.rotation.y=s*-.6;arm.add(up);palm.scale.set(1.3,.75,.8);palm.position.set(.32,.1,s*.2);arm.add(palm);
-    f1.rotation.z=-Math.PI/2;f1.position.set(.55,.06,s*.2);arm.add(f1);fin.position.set(.42,.16,s*.2);f2.rotation.z=-Math.PI/2;f2.position.set(.12,0,0);fin.add(f2);arm.add(fin);root.add(arm);
-    claws.push({fin,arm,s});dis.push(up.geometry,palm.geometry,f1.geometry,f2.geometry)}
-  dis.push(body.geometry,belly.geometry);root.scale.setScalar(.95);root.position.y=.15;
-  return {root,disposables:dis,update(t,dt,playing){if(!playing)return;
-    const w=t*5;root.position.z=.18*Math.sin(t*.9);root.position.y=.15+.025*Math.abs(Math.sin(w));
-    for(const l of legs){const ph=w+(l.i%2?Math.PI:0)+(l.s>0?0:Math.PI/2);l.hip.rotation.y=l.y0+.22*Math.sin(ph);l.hip.rotation.x=l.s*.2*Math.max(0,Math.cos(ph))}
-    for(const c of claws){c.fin.rotation.z=.35*Math.max(0,Math.sin(t*2.2+c.s));c.arm.rotation.y=.1*Math.sin(t*.8+c.s)}}};
+// Built from jointed parts. Limbs are chains of tapered segments that each lie along +x
+// from their joint, so a pose is just a rotation per joint (yaw, then pitch).
+const V2=(x,y)=>new THREE.Vector2(x,y);
+function segGeo(len,r0,r1,flat=1,n=12){ // rounded, tapered segment from x=0 to x=len
+  const pts=[V2(0,0)],c0=Math.min(r0,len*.35),c1=Math.min(r1,len*.35);
+  for(let i=1;i<=4;i++){const a=i/4*Math.PI/2;pts.push(V2(r0*Math.sin(a),c0*(1-Math.cos(a))))}
+  for(let i=1;i<=5;i++){const t=i/6,y=c0+(len-c0-c1)*t;pts.push(V2(lerp(r0,r1,t)*(1+.08*Math.sin(t*Math.PI)),y))}
+  for(let i=0;i<=4;i++){const a=i/4*Math.PI/2;pts.push(V2(r1*Math.cos(a),len-c1+c1*Math.sin(a)))}
+  pts.push(V2(0,len));
+  const g=new THREE.LatheGeometry(pts,n);g.rotateZ(-Math.PI/2);g.scale(1,flat,1);return g;
 }
-function buildCrayfish(P){
-  const root=new THREE.Group(),dis=[],[shell,legC,red,ant]=P.c;
-  const mS=new THREE.MeshStandardMaterial({color:shell,roughness:.45,metalness:.1}),mL=new THREE.MeshStandardMaterial({color:legC,roughness:.5}),mR=new THREE.MeshStandardMaterial({color:red,roughness:.5}),mW=new THREE.MeshStandardMaterial({color:'#d8f0ec',roughness:.4}),mA=new THREE.MeshStandardMaterial({color:ant,roughness:.5});dis.push(mS,mL,mR,mW,mA);
-  const thorax=new THREE.Mesh(new THREE.CapsuleGeometry(.2,.45,8,16),mS);thorax.rotation.z=Math.PI/2;thorax.scale.set(1,1,.95);thorax.position.x=.25;root.add(thorax);
-  const rost=new THREE.Mesh(new THREE.ConeGeometry(.06,.22,8),mS);rost.rotation.z=-Math.PI/2;rost.position.set(.68,.05,0);root.add(rost);dis.push(thorax.geometry,rost.geometry);
-  // Abdomen: chained pivots so the tail can curl under for the escape flick.
-  const segs=[];let parent=root,x=-.05;
-  for(let i=0;i<6;i++){const pv=new THREE.Group(),r=.17-i*.018,m=new THREE.Mesh(new THREE.SphereGeometry(r,16,10),mS);m.scale.set(1.15,.8,1.2);m.position.x=-r*.7;pv.add(m);
-    pv.position.set(i?-(.17-(i-1)*.018)*1.15:x,i?0:.02,0);parent.add(pv);segs.push(pv);parent=pv;dis.push(m.geometry)}
-  const fan=new THREE.Group();fan.position.x=-.16;parent.add(fan);
-  for(let i=-2;i<=2;i++){const g=new THREE.Shape();g.moveTo(0,0);g.lineTo(-.22,-.06);g.quadraticCurveTo(-.3,0,-.22,.06);g.lineTo(0,0);
-    const sg=new THREE.ShapeGeometry(g),m=new THREE.Mesh(sg,new THREE.MeshStandardMaterial({color:shell,side:THREE.DoubleSide,roughness:.5}));m.rotation.x=Math.PI/2;m.rotation.z=0;m.rotation.y=0;
-    const h=new THREE.Group();h.rotation.y=i*.32;h.add(m);fan.add(h);dis.push(sg,m.material)}
-  for(const s of[1,-1]){
-    const e=new THREE.Mesh(new THREE.SphereGeometry(.04,12,10),new THREE.MeshStandardMaterial({color:'#111',roughness:.1}));e.position.set(.62,.13,s*.09);root.add(e);dis.push(e.geometry,e.material)}
-  const ants=[],legs=[],claws=[];
-  for(const s of[1,-1]){
-    const pts=[];for(let i=0;i<=10;i++){const f=i/10;pts.push(new THREE.Vector3(f*1.1-.2*f*f*f*4,.15*f,s*(.1+f*.5)))}
-    const ag=new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),24,.009,4),a=new THREE.Group();a.position.set(.66,.08,s*.06);a.add(new THREE.Mesh(ag,mA));root.add(a);ants.push({a,s});dis.push(ag);
-    for(let i=0;i<4;i++){const hip=new THREE.Group(),l=limb(mL,.32,.022);hip.position.set(.45-i*.12,-.1,s*.14);l.rotation.x=s*-.9;hip.add(l);root.add(hip);legs.push({hip,s,i});dis.push(l.geometry)}
-    const arm=new THREE.Group(),up=limb(mR,.38,.05),palm=new THREE.Mesh(new THREE.SphereGeometry(.13,16,12),mR),patch=new THREE.Mesh(new THREE.SphereGeometry(.05,10,8),mW),under=new THREE.Mesh(new THREE.SphereGeometry(.12,16,10,0,TAU,Math.PI/2,Math.PI/2),mR);
-    const fixed=new THREE.Mesh(new THREE.ConeGeometry(.055,.32,8),mR),mv=new THREE.Group(),mvf=new THREE.Mesh(new THREE.ConeGeometry(.045,.3,8),mR);
-    arm.position.set(.55,-.02,s*.15);up.rotation.z=Math.PI/2+.25;up.rotation.y=s*-.7;arm.add(up);
-    const hand=new THREE.Group();hand.position.set(.32,.08,s*.27);palm.scale.set(1.7,.7,.9);patch.position.set(-.18,.05,s*.04);under.scale.set(1.6,.5,.85);hand.add(palm,patch,under);
-    fixed.rotation.z=-Math.PI/2;fixed.position.set(.36,0,-s*.03);hand.add(fixed);mv.position.set(.2,.03,s*.05);mvf.rotation.z=-Math.PI/2;mvf.position.set(.15,0,0);mv.add(mvf);hand.add(mv);
-    hand.rotation.y=s*-.25;arm.add(hand);root.add(arm);claws.push({mv,arm,s});dis.push(up.geometry,palm.geometry,patch.geometry,under.geometry,fixed.geometry,mvf.geometry)}
-  root.position.set(.15,.05,0);let flick=4;
-  return {root,disposables:dis,update(t,dt,playing){if(!playing)return;
-    const w=t*4;for(const l of legs){const ph=w+l.i*1.4+(l.s>0?0:Math.PI);l.hip.rotation.z=.25*Math.sin(ph);l.hip.rotation.y=.12*Math.cos(ph)}
-    for(const a of ants)a.a.rotation.y=a.s*.15*Math.sin(t*1.1+a.s)+.05*Math.sin(t*3.1);
-    for(const c of claws){c.mv.rotation.z=.3*Math.max(0,Math.sin(t*1.6+c.s*.8));c.arm.rotation.y=.12*Math.sin(t*.7+c.s)}
-    // Tail flick: curl under fast, dart backwards, then ease back out.
-    if(t>flick+1.6)flick=t+4+Math.random()*3;const k=t-flick,c=k<0?0:k<.18?smooth(k/.18):1-smooth((k-.18)/1.2);
-    segs.forEach((s,i)=>{s.rotation.z=i?-c*.42:0});root.position.x=.15-.5*Math.sin(Math.min(1,Math.max(0,k/1.4))*Math.PI)*(k>0?1:0)}};
+function joint(parent,x,y,z){const j=new THREE.Group();j.rotation.order='YZX';j.position.set(x,y,z);parent.add(j);return j}
+// Chain of segments: specs [{len,r0,r1,flat,mat,yaw,pitch,roll}] -> joints (joint i holds segment i).
+function chain(parent,at,specs,dis){
+  const joints=[];let p=parent,pos=at;
+  for(const s of specs){const j=joint(p,...pos);j.rotation.set(s.roll||0,s.yaw||0,s.pitch||0);
+    const g=segGeo(s.len,s.r0,s.r1,s.flat||1),m=new THREE.Mesh(g,s.mat);j.add(m);dis.push(g);
+    if(s.knob){const k=new THREE.Mesh(new THREE.SphereGeometry(s.r1*1.05,10,8),s.knob);k.position.x=s.len;j.add(k);dis.push(k.geometry)}
+    joints.push(j);p=j;pos=[s.len,0,0]}
+  for(const j of joints)j.userData.rest=[j.rotation.x,j.rotation.y,j.rotation.z];
+  return joints;
+}
+// Painted shell texture: base colour, darker grooves, speckles; doubles as the bump map.
+function shellTex(w,h,paint){const c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');paint(g,w,h,rng(w*7+h));
+  const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=4;return t}
+function speckle(g,w,h,rand,n,cols,r0,r1,alpha=.5){for(let i=0;i<n;i++){g.globalAlpha=alpha*rand();g.fillStyle=cols[Math.floor(rand()*cols.length)];g.beginPath();g.arc(rand()*w,rand()*h,r0+rand()*(r1-r0),0,TAU);g.fill()}g.globalAlpha=1}
+const shell=(map,extra={})=>new THREE.MeshPhysicalMaterial({map,bumpMap:map,bumpScale:extra.bump??2.5,roughness:extra.rough??.42,metalness:0,clearcoat:.55,clearcoatRoughness:.35,...extra.opts});
+const plain=(color,rough=.45)=>new THREE.MeshPhysicalMaterial({color,roughness:rough,clearcoat:.4,clearcoatRoughness:.4});
+
+function buildCrab(){
+  const root=new THREE.Group(),dis=[],body=new THREE.Group();root.add(body);
+  // Carapace: domed, rounded-square outline, a little wider at the front.
+  const Lc=.5,Wc=.62,Hc=.27,N=40,M=72,pos=[],uv=[],idx=[],pos2=[],idx2=[];
+  const edge=a=>{const c=Math.cos(a),s=Math.sin(a),e=2/3.2,x=Lc*Math.sign(c)*Math.abs(c)**e;return[x,Wc*(1+.1*x/Lc)*Math.sign(s)*Math.abs(s)**e]};
+  for(let i=0;i<=N;i++){const r=i/N;for(let j=0;j<=M;j++){const [ex,ez]=edge(j/M*TAU),x=ex*r,z=ez*r;
+    pos.push(x,Hc*Math.pow(Math.max(0,1-r**2.4),.42)+.025*Math.sin(r*Math.PI)*(x>0?1:.4),z);uv.push(x/Lc*.5+.5,z/Wc*.5+.5);
+    pos2.push(x,-.09*Math.pow(Math.max(0,1-r**2),.5),z)}}
+  for(let i=0;i<N;i++)for(let j=0;j<M;j++){const a=i*(M+1)+j,b=a+M+1;idx.push(a,a+1,b,b,a+1,b+1);idx2.push(a,b,a+1,b,b+1,a+1)}
+  const geo=(p,ix)=>{const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(p,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));g.setIndex(ix);g.computeVertexNormals();dis.push(g);return g};
+  const topTex=shellTex(512,512,(g,w,h,rand)=>{
+    const gr=g.createRadialGradient(w*.55,h/2,10,w/2,h/2,w*.52);gr.addColorStop(0,'#4a3624');gr.addColorStop(.7,'#33251a');gr.addColorStop(.93,'#2a1d14');gr.addColorStop(1,'#6a4c30');g.fillStyle=gr;g.fillRect(0,0,w,h);
+    g.strokeStyle='#160f0a';g.lineWidth=7;g.lineCap='round';g.globalAlpha=.75; // H-shaped grooves
+    g.beginPath();g.moveTo(w*.62,h*.3);g.quadraticCurveTo(w*.5,h*.42,w*.36,h*.36);g.moveTo(w*.62,h*.7);g.quadraticCurveTo(w*.5,h*.58,w*.36,h*.64);g.moveTo(w*.5,h*.42);g.lineTo(w*.5,h*.58);g.stroke();
+    g.lineWidth=4;g.beginPath();g.moveTo(w*.75,h*.22);g.quadraticCurveTo(w*.7,h*.12,w*.6,h*.1);g.moveTo(w*.75,h*.78);g.quadraticCurveTo(w*.7,h*.88,w*.6,h*.9);g.stroke();g.globalAlpha=1;
+    speckle(g,w,h,rand,2600,['#6b5038','#1a120c','#7d6040'],.8,2.6,.45);speckle(g,w,h,rand,140,['#c9a87a'],1,2.2,.35)});
+  const underTex=shellTex(256,256,(g,w,h,rand)=>{g.fillStyle='#8b9183';g.fillRect(0,0,w,h);g.strokeStyle='#5c6258';g.lineWidth=3;for(let i=1;i<6;i++){g.beginPath();g.moveTo(0,h*i/6);g.lineTo(w,h*i/6);g.stroke()}speckle(g,w,h,rand,500,['#b7bcaa','#5c6258'],1,3,.4)});
+  const top=new THREE.Mesh(geo(pos,idx),shell(topTex,{bump:3})),under=new THREE.Mesh(geo(pos2,idx2),shell(underTex,{bump:1.5,rough:.6}));
+  body.add(top,under);dis.push(topTex,underTex,top.material,under.material);
+  const mLeg=shell(shellTex(128,64,(g,w,h,rand)=>{const gr=g.createLinearGradient(0,0,w,0);gr.addColorStop(0,'#7a3c16');gr.addColorStop(.5,'#c0702e');gr.addColorStop(1,'#d88a3c');g.fillStyle=gr;g.fillRect(0,0,w,h);speckle(g,w,h,rand,300,['#5a2a10','#e8a860'],.6,1.6,.5)}),{bump:1.2});
+  const mJoint=plain('#4a2410',.5),mClaw=shell(shellTex(256,128,(g,w,h,rand)=>{const gr=g.createLinearGradient(0,0,w,0);gr.addColorStop(0,'#9a4a14');gr.addColorStop(.6,'#d27a2c');gr.addColorStop(1,'#e8a04a');g.fillStyle=gr;g.fillRect(0,0,w,h);speckle(g,w,h,rand,700,['#8a3e12','#f0b868'],.8,2.2,.45)}),{bump:1.5,rough:.32});
+  const mFinger=plain('#ead6a2',.3),mTip=plain('#3a2a1c',.4),mEye=plain('#0b0907',.12);
+  dis.push(mLeg,mJoint,mClaw,mFinger,mTip,mEye,mLeg.map,mClaw.map);
+  // Eyes on short stalks in the front notches.
+  const eyes=[];for(const s of[1,-1]){const st=chain(body,[Lc*.88,.17,s*.15],[{len:.13,r0:.03,r1:.026,mat:mClaw,yaw:-s*.25,pitch:1.15}],dis)[0];
+    const e=new THREE.Mesh(new THREE.SphereGeometry(.042,14,10),mEye);e.position.x=.14;st.add(e);dis.push(e.geometry);eyes.push(st)}
+  // Walking legs: 4 pairs, out and up to the knee, then down to a sharp tip.
+  const legs=[];[[.22,.62],[.06,.2],[-.12,-.2],[-.28,-.62]].forEach(([x,spread],i)=>{for(const s of[1,-1]){
+    const z=s*Wc*(.82-.12*Math.abs(x)),js=chain(body,[x,.0,z],[
+      {len:.1,r0:.05,r1:.05,mat:mLeg,yaw:-s*(Math.PI/2-spread),pitch:.12,knob:mJoint},
+      {len:.44,r0:.052,r1:.046,flat:.62,mat:mLeg,pitch:.16,knob:mJoint},
+      {len:.2,r0:.042,r1:.038,flat:.7,mat:mLeg,pitch:-1.0,knob:mJoint},
+      {len:.24,r0:.036,r1:.026,flat:.75,mat:mLeg,pitch:-.3},
+      {len:.22,r0:.024,r1:.004,mat:mTip,pitch:-.25}],dis);
+    legs.push({js,s,i})}});
+  // Claws: one large, one small, held in front with the fingers pointing inwards.
+  const claws=[];for(const s of[1,-1]){const big=s>0?1:.62;
+    const js=chain(body,[Lc*.62,.0,s*Wc*.62],[
+      {len:.2*big+.06,r0:.06,r1:.065,mat:mClaw,yaw:-s*.85,pitch:.2,knob:mClaw},
+      {len:.16*big+.04,r0:.07*big+.02,r1:.09*big+.02,mat:mClaw,yaw:s*1.15,pitch:-.12,knob:mClaw},
+      {len:.4*big,r0:.15*big,r1:.15*big,flat:1.25,mat:mClaw,yaw:s*.7,pitch:-.05}],dis);
+    const palm=js[2],fixed=chain(palm,[.36*big,-.07*big,0],[{len:.26*big,r0:.07*big,r1:.035*big,flat:.8,mat:mFinger,pitch:-.1},{len:.12*big,r0:.03*big,r1:.008,mat:mFinger,pitch:.35}],dis);
+    const mov=chain(palm,[.32*big,.1*big,0],[{len:.29*big,r0:.06*big,r1:.032*big,flat:.8,mat:mFinger,pitch:.28},{len:.12*big,r0:.03*big,r1:.008,mat:mFinger,pitch:-.55}],dis);
+    claws.push({js,mov,s,big})}
+  body.position.y=.38;root.scale.setScalar(1);
+  let pinchAt=1.5;
+  return{root,disposables:dis,update(t,dt,playing){if(!playing)return;
+    const w=t*5.5,side=Math.sin(t*.55);
+    body.position.z=.16*side;body.position.y=.38+.02*Math.abs(Math.sin(w));body.rotation.x=.04*Math.sin(w);
+    for(const l of legs){const ph=w+((l.i+(l.s>0?0:1))%2?Math.PI:0),[,ry,rz]=l.js[0].userData.rest;
+      l.js[0].rotation.y=ry+.2*Math.sin(ph);l.js[0].rotation.z=rz+.22*Math.max(0,Math.cos(ph));l.js[2].rotation.z=l.js[2].userData.rest[2]+.12*Math.cos(ph)}
+    if(t>pinchAt+1.6)pinchAt=t+2+Math.random()*2.5;
+    for(const c of claws){const k=t-pinchAt,open=k<0?0:k<.25?smooth(k/.25):k<.7?1:1-smooth((k-.7)/.25);
+      c.mov[0].rotation.z=c.mov[0].userData.rest[2]+.55*open*(c.s>0?1:.7);c.js[0].rotation.z=c.js[0].userData.rest[2]+.12*open+.04*Math.sin(t*1.3+c.s)}
+    for(const e of eyes)e.rotation.z=e.userData.rest[2]+.08*Math.sin(t*2.1+e.position.z*20)}};
+}
+
+function buildCrayfish(){
+  const root=new THREE.Group(),dis=[],body=new THREE.Group();root.add(body);
+  const olive=(g,w,h,rand,top,side,lines)=>{const gr=g.createLinearGradient(0,0,0,h);gr.addColorStop(0,top);gr.addColorStop(.55,side[0]);gr.addColorStop(1,side[1]);g.fillStyle=gr;g.fillRect(0,0,w,h);
+    speckle(g,w,h,rand,1600,['#3a3320','#b5a46a','#2f4a44'],.6,2,.4);if(lines)lines(g,w,h)};
+  // Carapace: a lathe along x (tail end at 0, head at .82), narrower at the head, plus a pointed rostrum.
+  const prof=[V2(0,0)];for(let i=1;i<=24;i++){const t=i/24;prof.push(V2(.215*Math.pow(Math.sin(Math.PI*Math.min(1,t*1.05)),.55)*(1-.35*t),t*.82))}prof.push(V2(0,.82));
+  const cg=new THREE.LatheGeometry(prof,40);cg.rotateZ(-Math.PI/2);cg.scale(1,.92,1.08);
+  { // map u along the body, v around it (top in the middle of the texture)
+    const p=cg.attributes.position,uvs=new Float32Array(p.count*2);for(let i=0;i<p.count;i++){uvs[i*2]=p.getX(i)/.82;uvs[i*2+1]=.5+Math.atan2(p.getZ(i),p.getY(i))/TAU}cg.setAttribute('uv',new THREE.BufferAttribute(uvs,2))}
+  const cTex=shellTex(512,256,(g,w,h,rand)=>{const gr=g.createLinearGradient(0,0,0,h);gr.addColorStop(0,'#4d6a60');gr.addColorStop(.3,'#6d6440');gr.addColorStop(.5,'#857646');gr.addColorStop(.7,'#6d6440');gr.addColorStop(1,'#4d6a60');g.fillStyle=gr;g.fillRect(0,0,w,h);
+    g.strokeStyle='#2a2616';g.lineWidth=5;g.globalAlpha=.8;g.beginPath();g.moveTo(w*.55,0);g.quadraticCurveTo(w*.5,h*.5,w*.55,h);g.stroke(); // cervical groove
+    g.lineWidth=2;g.beginPath();g.moveTo(w*.62,h*.5);g.lineTo(w,h*.5);g.stroke();g.globalAlpha=1;
+    speckle(g,w,h,rand,2400,['#2e2a18','#a89a62','#2c463f'],.6,2.2,.45)});
+  const mCar=shell(cTex,{bump:2.4,rough:.38}),car=new THREE.Mesh(cg,mCar);car.position.x=.12;body.add(car);dis.push(cg,cTex,mCar);
+  const rg=segGeo(.26,.07,.008,.45);const ros=new THREE.Mesh(rg,mCar);ros.position.set(.9,.05,0);ros.rotation.z=-.08;body.add(ros);dis.push(rg);
+  // Abdomen: six overlapping armour bands on a chain of pivots so it can curl for the tail flick.
+  const aTex=shellTex(256,128,(g,w,h,rand)=>{olive(g,w,h,rand,'#857646',['#6d6440','#4d6a60']);g.fillStyle='#b4a874';g.globalAlpha=.55;g.fillRect(w*.78,0,w*.22,h);g.globalAlpha=1});
+  const mAb=shell(aTex,{bump:2,rough:.38,opts:{side:THREE.DoubleSide}});dis.push(aTex,mAb);
+  const mUnder=plain('#8c8a6c',.55);dis.push(mUnder);
+  const segs=[];let parent=body,px=.14;
+  for(let i=0;i<6;i++){const r=.185-i*.016,len=.16-i*.007,pv=new THREE.Group();pv.position.set(i?-segs[i-1].len*.9:px,i?-.008:.0,0);parent.add(pv);
+    const arc=Math.PI*1.4,g=new THREE.LatheGeometry([V2(r*.86,0),V2(r*.97,len*.22),V2(r,len*.6),V2(r*.95,len*1.05),V2(r*.88,len*1.12)],28,Math.PI*1.5-arc/2,arc);
+    g.rotateZ(Math.PI/2);g.scale(1,.95,1.08);g.translate(len*.1,0,0);
+    const m=new THREE.Mesh(g,mAb);pv.add(m);dis.push(g);
+    const ug=new THREE.SphereGeometry(1,16,8);ug.scale(len*.62,r*.32,r*.84);const um=new THREE.Mesh(ug,mUnder);um.position.set(-len*.45,-r*.5,0);pv.add(um);dis.push(ug); // underside plate
+    // side plates (pleura) hanging down each side
+    for(const s of[1,-1]){const pg=new THREE.SphereGeometry(1,10,8,0,Math.PI,0,Math.PI);pg.scale(len*.5,r*.5,.02);const pm=new THREE.Mesh(pg,mAb);pm.position.set(-len*.5,-r*.5,s*r*1.02);pm.rotation.y=s>0?0:Math.PI;pv.add(pm);dis.push(pg)}
+    segs.push({pv,len});parent=pv}
+  // Tail fan: telson plus two pairs of uropods.
+  const fTex=shellTex(128,128,(g,w,h,rand)=>{g.fillStyle='#6f9585';g.fillRect(0,0,w,h);g.strokeStyle='#3d5a50';g.lineWidth=2;for(let i=0;i<9;i++){g.beginPath();g.moveTo(w*i/8,0);g.lineTo(w*i/8,h);g.stroke()}speckle(g,w,h,rand,300,['#88a090','#203028'],.6,1.6,.5)});
+  const mFan=new THREE.MeshPhysicalMaterial({map:fTex,side:THREE.DoubleSide,roughness:.4,clearcoat:.5,transparent:true,opacity:.95});dis.push(fTex,mFan);
+  const fan=new THREE.Group();fan.position.x=-segs[5].len*.85;parent.add(fan);
+  const blade=(w,l)=>{const s=new THREE.Shape();s.moveTo(0,-w*.25);s.quadraticCurveTo(-l*.6,-w*.75,-l,-w*.4);s.quadraticCurveTo(-l*1.08,0,-l,w*.4);s.quadraticCurveTo(-l*.6,w*.75,0,w*.25);const g=new THREE.ShapeGeometry(s,8);g.rotateX(Math.PI/2);dis.push(g);return g};
+  for(const [a,w,l] of [[0,.13,.24],[.42,.11,.23],[-.42,.11,.23],[.78,.1,.2],[-.78,.1,.2]]){const m=new THREE.Mesh(blade(w,l),mFan);m.rotation.y=a;m.rotation.z=.08;fan.add(m)}
+  // Materials for limbs.
+  const mClaw=shell(shellTex(256,128,(g,w,h,rand)=>{const gr=g.createLinearGradient(0,0,0,h);gr.addColorStop(0,'#3b1f14');gr.addColorStop(.45,'#7a2e1e');gr.addColorStop(1,'#b8462c');g.fillStyle=gr;g.fillRect(0,0,w,h);speckle(g,w,h,rand,900,['#2a140c','#c8603c'],.6,2,.45)}),{bump:1.8,rough:.34});
+  const mLeg=shell(shellTex(64,64,(g,w,h,rand)=>{g.fillStyle='#6f7a74';g.fillRect(0,0,w,h);speckle(g,w,h,rand,200,['#9aa49c','#3e4640'],.5,1.4,.5)}),{bump:1});
+  const mJoint=plain('#c8602e',.45),mSignal=plain('#e9f2ee',.3),mAnt=plain('#2c1d18',.5),mEye=plain('#070707',.1);
+  dis.push(mClaw,mLeg,mJoint,mSignal,mAnt,mEye,mClaw.map,mLeg.map);
+  // Eyes, antennae, antennules.
+  for(const s of[1,-1]){const e=new THREE.Mesh(new THREE.SphereGeometry(.035,12,10),mEye);e.position.set(.86,.1,s*.07);body.add(e);dis.push(e.geometry)}
+  const ants=[];for(const s of[1,-1]){const pts=[];for(let i=0;i<=16;i++){const f=i/16;pts.push(new THREE.Vector3(.95*Math.sin(f*1.9)+.05*f,.22*f-.12*f*f,s*(.03+.55*f*f)))}
+    const g=new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),48,.009,5),a=new THREE.Group();a.position.set(.9,.06,s*.06);a.add(new THREE.Mesh(g,mAnt));a.userData.noFit=true;body.add(a);ants.push({a,s});dis.push(g);
+    for(const k of[.6,1]){const q=[];for(let i=0;i<=6;i++){const f=i/6;q.push(new THREE.Vector3(.28*f,.08*f*k,s*.04*f*k))}const ag=new THREE.TubeGeometry(new THREE.CatmullRomCurve3(q),12,.005,4),am=new THREE.Mesh(ag,mAnt);am.position.set(.93,.08,s*.03);body.add(am);dis.push(ag)}
+    const sc=segGeo(.14,.03,.01,.3),sm=new THREE.Mesh(sc,mClaw);sm.position.set(.86,.03,s*.1);sm.rotation.y=-s*.3;body.add(sm);dis.push(sc)}
+  // Claws (chelipeds): held forward, palms flattened, white "signal" patch at the hinge.
+  const claws=[];for(const s of[1,-1]){const js=chain(body,[.74,-.08,s*.1],[
+      {len:.24,r0:.04,r1:.045,mat:mClaw,yaw:-s*.75,pitch:-.12,knob:mClaw},
+      {len:.17,r0:.05,r1:.055,mat:mClaw,yaw:s*.85,pitch:.05,knob:mSignal},
+      {len:.4,r0:.115,r1:.1,flat:.48,mat:mClaw,yaw:s*.05,pitch:-.02}],dis);
+    const palm=js[2];chain(palm,[.37,-.01,-s*.045],[{len:.3,r0:.055,r1:.014,flat:.55,mat:mClaw,pitch:.02,yaw:s*.07}],dis);
+    const mov=chain(palm,[.34,.01,s*.05],[{len:.3,r0:.05,r1:.012,flat:.55,mat:mClaw,pitch:.08,yaw:-s*.1}],dis);
+    claws.push({js,mov,s})}
+  // Walking legs: 4 pairs, thin, with orange joints.
+  const legs=[];[.62,.5,.38,.26].forEach((x,i)=>{for(const s of[1,-1]){const js=chain(body,[x,-.12,s*.11],[
+      {len:.17,r0:.022,r1:.02,mat:mLeg,yaw:-s*(Math.PI/2-(.5-i*.32)),pitch:.12,knob:mJoint},
+      {len:.13,r0:.019,r1:.017,mat:mLeg,pitch:-1.15,knob:mJoint},
+      {len:.13,r0:.016,r1:.012,mat:mLeg,pitch:-.35,knob:mJoint},
+      {len:.07,r0:.011,r1:.003,mat:mJoint,pitch:-.25}],dis);legs.push({js,s,i})}});
+  body.position.set(-.08,.12,0);let flick=4;
+  return{root,disposables:dis,update(t,dt,playing){if(!playing)return;
+    const w=t*4;for(const l of legs){const ph=w+l.i*1.3+(l.s>0?0:Math.PI),[,ry,rz]=l.js[0].userData.rest;l.js[0].rotation.y=ry+.16*Math.sin(ph);l.js[0].rotation.z=rz+.15*Math.max(0,Math.cos(ph))}
+    for(const a of ants){a.a.rotation.y=a.s*.12*Math.sin(t*1.1+a.s)+.06*Math.sin(t*3.1);a.a.rotation.z=.05*Math.sin(t*1.7+a.s)}
+    for(const c of claws){c.mov[0].rotation.z=c.mov[0].userData.rest[2]+.32*Math.max(0,Math.sin(t*1.5+c.s*.8));c.js[0].rotation.y=c.js[0].userData.rest[1]+.1*Math.sin(t*.7+c.s)}
+    // Tail flick: curl the tail under fast, dart backwards, then ease back out.
+    if(t>flick+1.8)flick=t+4+Math.random()*3;const k=t-flick,c=k<0?0:k<.18?smooth(k/.18):1-smooth((k-.18)/1.2);
+    segs.forEach((s,i)=>{s.pv.rotation.z=i?c*.5:c*.2});fan.rotation.z=c*.6;
+    body.position.x=-.08-.55*Math.sin(Math.min(1,Math.max(0,k/1.4))*Math.PI)*(k>0?1:0);body.position.y=.12+.03*c}};
 }
 
 // -------------------------------------------------------------------- viewer
@@ -443,10 +540,16 @@ export function mount(host,name){
   const key=new THREE.DirectionalLight('#ffffff',2.2);key.position.set(2,4,3);scene.add(key);
   const rim=new THREE.DirectionalLight('#7fe0c8',1.1);rim.position.set(-3,1.5,-2.5);scene.add(rim);
   const view=new THREE.Group(),swim=new THREE.Group();view.add(swim);scene.add(view);
-  let model=null,gone=false,ext={r:1.3,h:.75};
-  const use=(m,kind)=>{if(gone){for(const d of m.disposables)d.dispose&&d.dispose();return}host.dataset.model=kind;model=m;swim.add(m.root);
-    m.update(0,0,false);const box=new THREE.Box3().setFromObject(m.root);
-    ext={r:Math.max(Math.abs(box.min.x),Math.abs(box.max.x),Math.abs(box.min.z),Math.abs(box.max.z)),h:Math.max(Math.abs(box.min.y),Math.abs(box.max.y))};resize();
+  let model=null,gone=false,fitPts=null;
+  // Centre the model and keep a sample of its points (antennae and other noFit parts left out)
+  // so the camera can be framed on what's actually visible from the starting angle.
+  const use=(m,kind)=>{if(gone){for(const d of m.disposables)d.dispose&&d.dispose();return}host.dataset.model=kind;model=m;
+    const holder=new THREE.Group();holder.add(m.root);swim.add(holder);m.update(0,0,false);holder.updateMatrixWorld(true);
+    const inv=holder.matrixWorld.clone().invert(),M=new THREE.Matrix4(),v=new THREE.Vector3(),pts=[],box=new THREE.Box3();
+    m.root.traverse(o=>{if(!o.isMesh)return;for(let a=o;a;a=a.parent)if(a.userData.noFit)return;
+      M.multiplyMatrices(inv,o.matrixWorld);const pa=o.geometry.attributes.position,step=Math.max(1,Math.floor(pa.count/400));
+      for(let i=0;i<pa.count;i+=step){v.fromBufferAttribute(pa,i).applyMatrix4(M);pts.push(v.clone());box.expandByPoint(v)}});
+    const c=box.getCenter(new THREE.Vector3());holder.position.copy(c).negate();fitPts=pts.map(p=>p.sub(c));resize();
     hint.textContent=matchMedia('(pointer: fine)').matches?'Drag to spin · Ctrl + scroll to zoom · double-click to reset':'Drag to spin · pinch to zoom';host.classList.add('m3dReady')};
   const slug=name.replace(/[^A-Za-z0-9]+/g,'-').replace(/-+$/,''),S=SHAPES[slug];
   const start=()=>{if(crust||!S)use(P.crab?buildCrab(P):P.crayfish?buildCrayfish(P):buildFish(P,name,swim),'built');
@@ -455,9 +558,14 @@ export function mount(host,name){
   const pg=new THREE.BufferGeometry(),pp=[];for(let i=0;i<160;i++)pp.push((Math.random()-.5)*7,(Math.random()-.5)*4,(Math.random()-.5)*4-1);
   pg.setAttribute('position',new THREE.Float32BufferAttribute(pp,3));const pm=new THREE.PointsMaterial({color:'#bfeee0',size:.025,transparent:true,opacity:.45,depthWrite:false});
   const specks=new THREE.Points(pg,pm);scene.add(specks);
-  const rest={yaw:crust?-.7:Math.PI+.4,pitch:crust?.62:.16,zoom:1};let yaw=rest.yaw,pitch=rest.pitch,zoom=1,fit=4,vy=0,idle=0,playing=true,visible=true,raf=0,last=0;
+  const rest={yaw:P.crab?-.7:P.crayfish?-.55:Math.PI+.4,pitch:P.crab?.55:P.crayfish?.38:.16,zoom:1};let yaw=rest.yaw,pitch=rest.pitch,zoom=1,fit=4,vy=0,idle=0,playing=true,visible=true,raf=0,last=0;
   const resize=()=>{const w=host.clientWidth,h=host.clientHeight;if(!w||!h)return;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();
-    const tn=Math.tan(THREE.MathUtils.degToRad(camera.fov/2));fit=Math.max(ext.r*1.18/(tn*camera.aspect),(ext.h*1.25+.08)/tn)};
+    const tn=Math.tan(THREE.MathUtils.degToRad(camera.fov/2)),tw=tn*camera.aspect;
+    if(!fitPts){fit=1.6/Math.min(tn,tw);return}
+    const cy=Math.cos(rest.yaw),sy=Math.sin(rest.yaw),cp=Math.cos(rest.pitch),sp=Math.sin(rest.pitch);let d=0;
+    for(const p of fitPts){const x=p.x*cy+p.z*sy,z=-p.x*sy+p.z*cy,sx=Math.abs(x),syv=Math.abs(p.y*cp-z*sp),depth=p.y*sp+z*cp;
+      d=Math.max(d,depth+sx*1.1/tw,depth+syv*1.12/tn)}
+    fit=d+.15};
   const ro=new ResizeObserver(resize);ro.observe(host);resize();start();
   const pts=new Map();let pinch0=0,zoom0=1;
   canvas.addEventListener('pointerdown',e=>{canvas.setPointerCapture(e.pointerId);pts.set(e.pointerId,[e.clientX,e.clientY]);vy=0;idle=0;
