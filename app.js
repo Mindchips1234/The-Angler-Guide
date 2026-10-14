@@ -489,6 +489,7 @@ async function buildLegend(name){
   gv.innerHTML=`<div class="hero"><div class="eyebrow">${esc(l.reserves.join(', '))} · Legendary fish</div><h1>👑 ${esc(l.name)}</h1>
     <div class="stats">${l.species?`<div class="pill">🐟 ${esc(l.species)}</div>`:''}<div class="pill">⚖️ ${kgfmt(l.weight)}</div>${l.time?`<div class="pill">🕐 ${esc(l.time)}</div>`:''}</div>
     <div class="fishTools"><button class="toolAction${got?'':' primary'}" id="legendToggle" data-name="${esc(l.name)}">${got?'✓ Caught':'＋ Mark as caught'}</button>${fishHere?`<button class="toolAction" data-fishlink="${esc(rn+'::'+fishHere)}">${esc(fishHere)} guide →</button>`:''}</div></div>
+  <div class="card section catchGuide" id="catchGuide"><h2>How to catch ${esc(l.name)}</h2><div class="mutedBox">Loading…</div></div>
   <div class="detailgrid section"><div>
     <div class="card"><div class="imageWrap"><img class="heroimg" src="${l.image||''}" alt="${esc(l.name)}" onerror="imgFail(this)"></div>
       <div class="rows" style="margin-top:12px">${F('Weight',kgfmt(l.weight))}${F('Length',l.length)}${F('Spawn depth',sd(l.spawnDepth&&l.spawnDepth.replace(/m/g,'').replace(/\s*—\s*/,' – ')+' m'))}${F('Time of day',l.time)}${F('Preferred bait',l.preferred)}${F('Hook sizes',l.hooks.join(', '))}</div></div>
@@ -499,8 +500,89 @@ async function buildLegend(name){
     <div class="card" style="margin-top:18px"><h2>Traits</h2>${l.traits.length?`<ul class="traitList">${l.traits.map(t=>`<li><strong>${esc(t.name)}</strong><span>${esc(t.desc)}</span></li>`).join('')}</ul>`:'<div class="mutedBox">Not listed.</div>'}</div>
   </div></div><div class="source">Source: <a href="${l.source}" target="_blank" rel="noopener">The Angler Wiki</a> (community-maintained; may contain errors).</div>`;
   if(l.map)mkMap($('#lmap'),l.map);
+  catchGuide(l,L);
   const a=(await activeLegends())[rn];
   if(a&&a.legendary===l.name&&screen==='legend'){const st=$('.hero .stats',gv);if(st)st.insertAdjacentHTML('afterbegin',`<div class="pill twPill">📍 Active this week${a.spot?': '+esc(a.spot):''}</div>`)}
+}
+
+// ------------------------------------------------------------ legendary catching guide
+// Turns a legendary's facts (traits, depth, time, baits, hooks, weight) into a step-by-step plan,
+// with tackle picked from the gear list for its weight and the rig its best baits need.
+const TRAIT_TIPS={
+  'Bottom Lurker':'Stays near the bottom. Use a bottom rig, or let a jig or lure sink all the way down before you work it.',
+  'Jumper':"Leaps out of the water during the fight. Keep steady tension and stop cranking while it's in the air.",
+  'Night Owl':'More active at night, so plan your session after dark.',
+  'Hard Fighter':'Fights hard to throw the hook. Set the drag below your line rating and let it run instead of forcing it.',
+  'Aggressive':'Strikes without nibbling, so be ready to set the hook the moment the float dips or the rod tip pulls.',
+  'Keen Senses':'Senses food from far away and responds well to lures. A lure worked through its spot can pull it in.',
+  'Patient Scavenger':'Only bites bait that has been soaking a while. Cast a natural bait, leave it still and wait instead of recasting.',
+  'Ambusher':"Only bites lures that have just splashed down. Cast often and start working the lure straight away.",
+  'Last Stand':"Fights back hard when it's nearly landed. Don't relax at the end, and keep some drag in reserve.",
+  'Social Distancing':'Keeps its distance until hooked. Make long casts to its spot rather than getting close.',
+  'Rising Sun':'Comes up near the surface in the day but hides when it sees tackle. Cast well past it and bring the bait into its path.',
+  'Daredevil':'Hangs around waterfalls and fast water. Try the spots closest to rapids and falls.',
+  'Eagled Eyed':'Ignores every bait and lure until a lure has been twitched. Start with a lure on a Twitching retrieve.',
+  'Superiority Complex':'Bites eagerly. The hard part is the fight, not getting the bite.',
+  'Deep Speech':'Rises to the surface at night with a deep, gurgling noise. Listen for it after dark and fish shallower then.',
+  'Evil Eye':'Spooks nearby fish every so often. If a spot suddenly goes quiet, it may be close.',
+  'Siren Song':'Sings a mournful song. Listen for it near its spawn spots.',
+  'Run for your Money':'Keeps its distance until hooked. Make long casts to its spot.',
+  'Easily Spooked':'Scared off by people. Approach quietly, stay back and make long casts.',
+  'Sun Lover':'More active after sunrise, so fish in the morning and through the day.',
+  "Otashitonkuru's Rock":'Lore hint: its legend is tied to rocks and islands, so try spots near rocky islands.',
+  'The Deepest Reaches':'Lore hint: it waits in deep, cold water, so fish the deep end of its depth range.',
+  "Dragon's Gate":'Lore hint: its legend is about climbing a waterfall, so try spots near falls and strong current.',
+};
+async function catchGuide(l,L){
+  const box=$('#catchGuide');if(!box)return;
+  let G=null;try{G=await guide('gear')}catch(e){}
+  const act=(await activeLegends())[l.reserves[0]];if(!$('#catchGuide'))return;
+  const trait=n=>l.traits.some(t=>t.name===n),top=l.baits.length?l.baits.filter(b=>b[1]===l.baits[0][1]):[];
+  const isLure=b=>/ - (Constant|Jigging|Stop and Go|Twitching)$/.test(b[0]),lures=top.filter(isLure),naturals=top.filter(b=>!isLure(b));
+  // Lures grouped by type with their best retrieves, e.g. "Spinnerbait (Constant, Twitching)".
+  const byLure={};for(const [b] of lures){const [t,s]=b.split(' - ');(byLure[t]=byLure[t]||[]).push(s)}
+  const lureText=Object.entries(byLure).map(([t,s])=>`${t} (${s.join(', ')})`);
+  const [dMin,dMax]=(String(l.spawnDepth||'').match(/[\d.]+/g)||[]).map(Number);
+  const deep=dMin>=10;
+  const baitRig=trait('Bottom Lurker')||trait('Patient Scavenger')||deep?'Bottom':'Float';
+  const lureRig=lures.length&&lures.every(([b])=>/Jigging/.test(b))?'Jig':'Lure';
+  const rigs=[...(naturals.length?[[baitRig,'bait']]:[]),...(lures.length?[[lureRig,'lures']]:[])];
+  if(trait('Eagled Eyed'))rigs.reverse(); // it needs a twitched lure first
+  const rig=rigs.map(r=>r[0]);if(!rig.length)rig.push(baitRig);
+  const when=/day/i.test(l.time)&&/night/i.test(l.time)?'Any time of day':l.time==='Nighttime'?'Night only':l.time==='Daytime'?'Daytime only':(l.time||'Any time');
+  // Tackle for the main rig: line rated for its weight, a rod that takes that line, a reel with drag to match.
+  let tackle='';
+  if(G){
+    const w=l.weight,uses=x=>String(x.stats['Fishing Rigs']||'').includes(rig[0]),lv=x=>num(x.stats.Level)||0,byLv=(a,b)=>lv(a)-lv(b);
+    const rodCap=Math.max(0,...G.Rods.items.filter(uses).map(x=>num(x.stats['Max Line Strength'])||0))||Infinity; // no point in line a rod can't take
+    const lines=G.Lines.items.filter(uses).map(x=>({...x,test:num(x.stats['Test Weight'])})).filter(x=>x.test&&x.test<=rodCap).sort((a,b)=>a.test-b.test||lv(a)-lv(b));
+    const line=lines.find(x=>x.test>=w)||lines[lines.length-1],over=line&&line.test<w;
+    let rods=G.Rods.items.filter(x=>uses(x)&&num(x.stats['Max Line Strength'])>=(line?line.test:0)&&num(x.stats.Strength)>=Math.min(w,line?line.test:w)).sort(byLv);
+    const reels=G.Reels.items.filter(x=>uses(x)&&num(x.stats['Max Drag'])>=Math.min(w*.5,line?line.test*.5:w)).sort(byLv);
+    const list=a=>`<strong>${a.slice(0,3).map(x=>esc(x.name)+(lv(x)?` (level ${lv(x)})`:'')).join(', ')}</strong>`;
+    tackle=`<li><strong>Gear up for a ${kgfmt(w)} fish.</strong><div class="cgRows">
+      ${line?`<div class="row"><small>Line</small><strong>${esc(line.name)}${unit==='metric'?'':` (rated ${kgfmt(line.test)})`}</strong></div>`:''}
+      <div class="row"><small>Rod</small>${rods.length?list(rods):'<strong>Use your strongest rod</strong>'}</div>
+      <div class="row"><small>Reel</small>${reels.length?list(reels):'<strong>Use the reel with the most drag you have</strong>'}</div>
+      <div class="row"><small>Hooks</small><strong>${esc(l.hooks.join(', ')||'Not listed')}</strong></div></div>
+      ${over?`<p class="note">No ${rig[0].toLowerCase()} rig setup is rated for its full weight, so use the strongest line your rod takes and play it carefully: keep the drag below the line rating and let it tire itself out. Landing a fish heavier than the line multiplies your score.</p>`:''}</li>`;
+  }
+  const where=act&&act.legendary===l.name?`It's <strong>active this week</strong>${act.spot?` at <strong>${esc(act.spot)}</strong>`:''}.`
+    :act&&act.legendary?`This week's ${esc(l.reserves[0])} legendary is ${esc(act.legendary)}, so ${esc(l.name)} isn't active until a later week.`:`This week's legendary in ${esc(l.reserves[0])} isn't confirmed yet. Check the Home screen.`;
+  const others=L.filter(x=>x.reserves[0]===l.reserves[0]&&x.name!==l.name).map(x=>x.name);
+  box.innerHTML=`<h2>How to catch ${esc(l.name)}</h2><ol class="cgSteps">
+    <li><strong>Fish in its week.</strong> Each week one legendary is active in ${esc(l.reserves[0])}, picked at random${others.length?` from ${esc(l.name)}, ${esc(others.join(' and '))}`:''}. It changes every Wednesday at 10 pm US Eastern time, and each active legendary can only be caught once that week. ${where}</li>
+    <li><strong>Go to its spawn spots.</strong> ${l.map?'The map below shows the known spots. Each active week it appears at one of them, so work through them until you find it.':'No location map is published, so search its species\' usual water in this reserve.'}</li>
+    <li><strong>Pick your time.</strong> ${esc(when)}.${trait('Night Owl')?' It\'s most active at night.':''}${trait('Sun Lover')?' It\'s most active after sunrise.':''}</li>
+    <li><strong>Fish the right depth.</strong> It spawns ${dMin!=null?`between ${sd(dMin+' m')} and ${sd((dMax??dMin)+' m')}`:'at an unknown depth'}. ${trait('Bottom Lurker')||deep?'Get your bait down near the bottom.':'Set your float or let your lure sink into that range.'}</li>
+    <li><strong>Use its favourite ${naturals.length&&lures.length?'baits and lures':lures.length?'lures':'baits'}.</strong> ${top.length?`These have the best bite chance (${top[0][1]}%):`:'No bait preferences are listed.'}
+      ${naturals.length?`<div class="cgBaits"><small>Bait</small> ${naturals.map(b=>`<span class="tag${b[0]===l.preferred?' pref':''}">${b[0]===l.preferred?'★ ':''}${esc(b[0])}</span>`).join('')}</div>`:''}
+      ${lureText.length?`<div class="cgBaits"><small>Lures (retrieve)</small> ${lureText.map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>`:''}</li>
+    <li><strong>Rig up.</strong> ${rigs.length>1?`Use a <strong>${rigs[0][0]} rig</strong> for ${rigs[0][1]} or a <strong>${rigs[1][0]} rig</strong> for ${rigs[1][1]}. The gear below is for the ${rigs[0][0].toLowerCase()} rig.`:`Use a <strong>${rig[0]} rig</strong>.`}</li>
+    ${tackle}
+    ${l.traits.length?`<li><strong>Play to its traits.</strong><ul class="cgTraits">${l.traits.map(t=>`<li><strong>${esc(t.name)}:</strong> ${esc(TRAIT_TIPS[t.name]||t.desc)}</li>`).join('')}</ul></li>`:''}
+    <li><strong>Land it.</strong> When the tension climbs, stop reeling and let it run. Reel in when it tires${trait('Last Stand')?', and expect one last burst right at the end':''}. Then mark it as caught at the top of this page.</li>
+  </ol><p class="note">The plan is built from the wiki's facts for ${esc(l.name)} and the game's gear list. The trait tips are suggestions, not confirmed mechanics.</p>`;
 }
 
 // Missions and collectibles share one tick-off list design.
