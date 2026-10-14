@@ -1,4 +1,4 @@
-# Angler Guide 3.2
+# Angler Guide 3.3
 
 A fan-made, offline-ready field guide for the game *The Angler*, made by Vanderholst Studios. It covers all five reserves, 96 fish entries (84 species), 15 legendary fish, 313 missions, 247 collectibles and 175 pieces of gear, with a 3D model of every species and a log for everything you catch.
 
@@ -72,7 +72,7 @@ The app re-checks `data/this-week.json` whenever it's opened. It works out the r
 
 ## Releasing
 
-1. Bump `V` in `service-worker.js` (e.g. `angler-guide-v3-2`). This is what makes installed copies show the update banner.
+1. Bump `V` in `service-worker.js` (e.g. `angler-guide-v3-3`). This is what makes installed copies show the update banner.
 2. Update `APP_VERSION` in `app.js` so Settings shows the right version.
 
 ## Credits
