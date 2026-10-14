@@ -92,6 +92,10 @@ function buildHome(){
     <div class="stats"><span class="pill">🗺️ ${RESERVES.length} reserves</span><span class="pill">🐟 ${fishTotal} fish</span><span class="pill">👑 ${LEGENDS_TOTAL} legendaries</span></div>
     <div class="homeActions"><button class="primaryAction" id="browseReserves">Browse reserves <span aria-hidden="true">→</span></button><button class="secondaryAction" id="randomFish">Surprise me with a fish</button></div>
   </section>
+  <section class="section toolCard thisWeek" id="thisWeek" aria-live="polite">
+    <h2>👑 This week's legendaries</h2><p class="note" id="twWhen"></p>
+    <div id="twList" class="twList"><div class="mutedBox">Loading…</div></div>
+  </section>
   <section class="homeSearch">
     <label for="homeQuery">Looking for a specific fish?</label>
     <input class="input" id="homeQuery" type="search" placeholder="Search fish by name…" autocomplete="off">
@@ -120,9 +124,10 @@ function buildHome(){
     if(e.target.closest('#browseReserves'))$('#reserveDirectory').scrollIntoView({behavior:'smooth',block:'start'});
     if(e.target.closest('#randomFish')){const rname=RESERVES[Math.floor(Math.random()*RESERVES.length)],fish=DATA.reserves[rname].fish;go(rname,fish[Math.floor(Math.random()*fish.length)])}
     if(e.target.closest('#clearHomeSearch')){$('#homeQuery').value='';$('#homeReserveFilter').value='';renderHomeResults('');$('#homeQuery').focus()}
+    const lg=e.target.closest('[data-legend]');if(lg)return nav('/guides/legendary/'+encodeURIComponent(lg.dataset.legend));
     const result=e.target.closest('[data-home-fish]');if(result){const [rname,...parts]=result.dataset.homeFish.split('::');go(rname,parts.join('::'))}
   };
-  fillBaits();renderHomeResults('');
+  fillBaits();renderHomeResults('');renderThisWeek();
 }
 function renderHomeResults(query){
   const target=$('#homeResults');if(!target)return;
@@ -134,6 +139,56 @@ function renderHomeResults(query){
   const shown=matches.slice(0,24);
   target.innerHTML=shown.length?shown.map(x=>'<button class="homeResult" data-home-fish="'+esc(x.reserve+'::'+x.fish)+'"><span><strong>'+esc(x.fish)+'</strong><small>'+esc(x.reserve)+'</small><small class="homeBait">Preferred bait: '+esc(x.bait)+'</small></span><span aria-hidden="true">→</span></button>').join('')+(matches.length>shown.length?'<div class="homeHint">Showing the first '+shown.length+' of '+matches.length+' results. Add more letters to narrow your search.</div>':''):'<div class="mutedBox">No fish found. Try another name or select a different reserve.</div>';
 }
+
+// ------------------------------------------------------------ this week's legendaries
+// Each reserve has one legendary active per week, at one of its known spawn spots. The game picks
+// them at random, so the app can't work them out: data/this-week.json lists the confirmed ones and
+// is re-checked whenever the app opens. The week turns over every Wednesday at 10 pm US Eastern time.
+const ROT_TZ='America/New_York',WD=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+function tzParts(t){
+  const p=Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:ROT_TZ,hourCycle:'h23',weekday:'short',year:'numeric',month:'numeric',day:'numeric',hour:'numeric',minute:'numeric',second:'numeric'}).formatToParts(t).map(x=>[x.type,x.value]));
+  return{y:+p.year,m:+p.month,d:+p.day,h:+p.hour%24,min:+p.minute,s:+p.second,wd:WD.indexOf(p.weekday)};
+}
+function tzToUtc(y,m,d,h){ // wall-clock time in ROT_TZ -> timestamp (two passes settle the DST offset)
+  const guess=Date.UTC(y,m-1,d,h);let t=guess;
+  for(let i=0;i<2;i++){const p=tzParts(t);t=guess-(Date.UTC(p.y,p.m-1,p.d,p.h,p.min,p.s)-t)}
+  return t;
+}
+function rotation(now=Date.now()){
+  try{
+    const p=tzParts(now);let back=(p.wd-3+7)%7;if(back===0&&p.h<22)back=7;
+    const s=new Date(Date.UTC(p.y,p.m-1,p.d-back)),e=new Date(Date.UTC(p.y,p.m-1,p.d-back+7));
+    return{key:s.toISOString().slice(0,10),start:tzToUtc(s.getUTCFullYear(),s.getUTCMonth()+1,s.getUTCDate(),22),end:tzToUtc(e.getUTCFullYear(),e.getUTCMonth()+1,e.getUTCDate(),22)};
+  }catch(e){ // no time zone support: assume US Eastern standard time (UTC-5)
+    const w=7*864e5,base=Date.UTC(2024,0,4,3),start=base+Math.floor((now-base)/w)*w;
+    return{key:new Date(start-864e5).toISOString().slice(0,10),start,end:start+w};
+  }
+}
+let TW=null,TWat=0,twTimer=0;
+function thisWeek(){ // the shared file, fetched fresh at most every 10 minutes
+  if(!TW||Date.now()-TWat>6e5){TWat=Date.now();TW=fetch('./data/this-week.json',{cache:'no-cache'}).then(r=>{if(!r.ok)throw new Error(r.status);return r.json()}).catch(()=>{TWat=0;return{}})}
+  return TW;
+}
+// Confirmed legendary and spot per reserve for the current week ({} until someone confirms them).
+async function activeLegends(){const d=await thisWeek(),rot=rotation();return d&&d.week===rot.key&&d.reserves?d.reserves:{}}
+function untilText(ms){const m=Math.max(1,Math.round(ms/6e4)),d=Math.floor(m/1440),h=Math.floor(m%1440/60),mm=m%60;return d?`${d}d ${h}h`:h?`${h}h ${mm}m`:`${mm}m`}
+function renderTwWhen(){
+  const el=$('#twWhen');if(!el)return;const r=rotation(),day=t=>new Date(t).toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'});
+  el.textContent=`This rotation: ${day(r.start)} to ${day(r.end)}. Next change ${new Date(r.end).toLocaleString(undefined,{weekday:'short',hour:'numeric',minute:'2-digit'})} your time (in ${untilText(r.end-Date.now())}).`;
+}
+async function renderThisWeek(){
+  const box=$('#twList');if(!box)return;renderTwWhen();
+  let L=[];try{L=await guide('legendary')}catch(e){}
+  const act=await activeLegends(),got=legendsCaught();if(!$('#twList'))return;
+  box.innerHTML=RESERVES.map(rn=>{
+    const here=L.filter(l=>l.reserves[0]===rn),a=act[rn],l=a&&here.find(x=>x.name===a.legendary);
+    if(l)return `<button class="twRow" data-legend="${esc(l.name)}"><img src="${l.image||''}" alt="" loading="lazy" onerror="imgFail(this)"><span><strong>${esc(l.name)}</strong><small>${esc(rn)}</small><small class="twSpot">📍 ${esc(a.spot||'Spot not confirmed yet')}</small></span>${got.has(l.name)?'<em>✓ Caught</em>':'<span aria-hidden="true">→</span>'}</button>`;
+    return `<a class="twRow pending" href="#/guides/legendary"><img class="twLogo" src="${RIMG[rn]||''}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"><span><strong>${esc(rn)}</strong><small>Not confirmed yet${here.length?': one of '+esc(here.map(x=>x.name).join(', ')):''}</small></span><span aria-hidden="true">→</span></a>`;
+  }).join('');
+  clearTimeout(twTimer);twTimer=setTimeout(()=>{TW=null;renderThisWeek()},Math.min(rotation().end-Date.now()+5e3,864e5));
+}
+setInterval(renderTwWhen,6e4);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&$('#twList')){TWat=0;renderThisWeek()}});
 
 // "What's biting?": scores every fish in the reserve against time, water temperature and bait.
 function fillBaits(){
@@ -444,6 +499,8 @@ async function buildLegend(name){
     <div class="card" style="margin-top:18px"><h2>Traits</h2>${l.traits.length?`<ul class="traitList">${l.traits.map(t=>`<li><strong>${esc(t.name)}</strong><span>${esc(t.desc)}</span></li>`).join('')}</ul>`:'<div class="mutedBox">Not listed.</div>'}</div>
   </div></div><div class="source">Source: <a href="${l.source}" target="_blank" rel="noopener">The Angler Wiki</a> (community-maintained; may contain errors).</div>`;
   if(l.map)mkMap($('#lmap'),l.map);
+  const a=(await activeLegends())[rn];
+  if(a&&a.legendary===l.name&&screen==='legend'){const st=$('.hero .stats',gv);if(st)st.insertAdjacentHTML('afterbegin',`<div class="pill twPill">📍 Active this week${a.spot?': '+esc(a.spot):''}</div>`)}
 }
 
 // Missions and collectibles share one tick-off list design.
@@ -553,7 +610,7 @@ function route(){
   const fromTop=!home.hidden||!lv.hidden||!gv.hidden;
   if(!raw||raw==='/'||top===''||top==='home'){
     showOnly(home);setScreen('home');
-    if(!home.dataset.built){buildHome();home.dataset.built='1'}else renderBiting();
+    if(!home.dataset.built){buildHome();home.dataset.built='1'}else{renderBiting();renderThisWeek()}
     document.title='Angler Guide · Home';scrollTo(0,0);return;
   }
   if(top==='log'||top==='catches'){showOnly(lv);setScreen('log');buildLog();document.title='My log · Angler Guide';scrollTo(0,0);return}
