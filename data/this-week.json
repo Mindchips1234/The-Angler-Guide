@@ -1,4 +1,11 @@
 {
- "week": null,
- "reserves": {}
+ "week": "2026-10-14",
+ "reserves": {
+  "Golden Ridge Reserve": {
+   "legendary": "Big Larry",
+   "spot": "Spot not confirmed yet",
+   "source": "https://www.youtube.com/watch?v=mZDqXK5UOSo"
+  }
+ },
+ "updated": "2026-10-16T16:48Z"
 }
