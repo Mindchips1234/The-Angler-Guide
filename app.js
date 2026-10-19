@@ -4,7 +4,7 @@ const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelecto
 const store={get(k,d){try{return localStorage.getItem('ag2.'+k)||d}catch(e){return d}},set(k,v){try{localStorage.setItem('ag2.'+k,v)}catch(e){}}};
 const jget=(k,d)=>{try{const v=JSON.parse(store.get(k,''));return v==null?d:v}catch(e){return d}},jset=(k,v)=>store.set(k,JSON.stringify(v));
 const REGION={'Izilo Zasendulo':'Mpumalanga, South Africa'};
-const APP_VERSION='3.4',reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const APP_VERSION='3.5',reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
 let unit=store.get('unit','metric'),tu=store.get('temp','celsius'),R=null,lastFish=null,built=null,scrollRv=0,hmap=null;
 const home=$('#home'),rv=$('#rv'),fv=$('#fv'),lv=$('#lv'),gv=$('#gv'),back=$('#back'),sel=$('#rsel');
 const haptic=(ms=10)=>{try{navigator.vibrate&&navigator.vibrate(ms)}catch(e){}};
@@ -72,14 +72,23 @@ function bestFor(rn,fn,log=getLog()){ // best rank and heaviest weight logged fo
 function mkMap(host,base){
   host.innerHTML=`<div class="mapviewport"><div class="mapcanvas"><img src="${base}" alt="Map"><div class="hotspotLayer hidden"><img alt="Hotspot overlay"></div></div></div><div class="maptools"><button data-z="in" aria-label="Zoom in">+</button><button data-z="out" aria-label="Zoom out">−</button><button data-z="reset" aria-label="Reset view">⌂</button><a class="mapfull" href="${base}" target="_blank" rel="noopener" aria-label="Open full map">↗</a></div>`;
   const vp=$('.mapviewport',host),cv=$('.mapcanvas',host),ly=$('.hotspotLayer',host),oi=$('img',ly),s={k:1,x:0,y:0},pts=new Map();let d0=1,k0=1;
-  const ap=()=>cv.style.transform=`translate(${s.x}px,${s.y}px) scale(${s.k})`,cl=k=>Math.max(.75,Math.min(4,k)),dist=()=>{const [a,b]=[...pts.values()];return Math.hypot(a[0]-b[0],a[1]-b[1])||1};
+  const ap=()=>{cv.style.transform=`translate(${s.x}px,${s.y}px) scale(${s.k})`;cv.style.setProperty('--k',s.k)},cl=k=>Math.max(.75,Math.min(4,k)),dist=()=>{const [a,b]=[...pts.values()];return Math.hypot(a[0]-b[0],a[1]-b[1])||1};
   vp.onpointerdown=e=>{vp.setPointerCapture(e.pointerId);pts.set(e.pointerId,[e.clientX,e.clientY]);if(pts.size==2){d0=dist();k0=s.k}};
   vp.onpointermove=e=>{const p=pts.get(e.pointerId);if(!p)return;if(pts.size==1){s.x+=e.clientX-p[0];s.y+=e.clientY-p[1]}pts.set(e.pointerId,[e.clientX,e.clientY]);if(pts.size==2)s.k=cl(k0*dist()/d0);ap()};
   vp.onpointerup=vp.onpointercancel=e=>pts.delete(e.pointerId);
   vp.onwheel=e=>{if(!(e.ctrlKey||e.metaKey))return;e.preventDefault();s.k=cl(s.k*(e.deltaY<0?1.15:.87));ap()};
   host.onclick=e=>{const z=e.target.closest('[data-z]');if(!z)return;if(z.dataset.z==='reset'){s.k=1;s.x=s.y=0}else s.k=cl(s.k*(z.dataset.z==='in'?1.25:.8));ap()};
   const clear=()=>{ly.classList.add('hidden');cv.classList.remove('hotspot-active')};
-  return{clear,show(url,fail){cv.classList.add('hotspot-active');oi.onload=()=>ly.classList.remove('hidden');oi.onerror=()=>{clear();fail&&fail()};oi.src=url}};
+  // Centre the view on (px,py), given as fractions of the map, at zoom k.
+  const focus=(px,py,k)=>{s.k=cl(k);const W=vp.clientWidth,H=vp.clientHeight,mx=Math.max(0,(s.k-1)*W/2),my=Math.max(0,(s.k-1)*H/2); // keep the map filling the view
+    s.x=Math.max(-mx,Math.min(mx,-(px-.5)*W*s.k));s.y=Math.max(-my,Math.min(my,-(py-.5)*H*s.k));ap()};
+  // Zoom so every point fits with some margin around it.
+  const fit=pts=>{if(!pts.length)return;const xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]),x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);
+    focus((x0+x1)/2,(y0+y1)/2,Math.max(1,Math.min(3,1/(Math.max(x1-x0,y1-y0)+.3))))};
+  return{clear,focus,fit,show(url,fail){cv.classList.add('hotspot-active');oi.onload=()=>ly.classList.remove('hidden');oi.onerror=()=>{clear();fail&&fail()};oi.src=url},
+    // Numbered markers for spawn spots, drawn over the map at a constant size on screen.
+    pins(pts){cv.insertAdjacentHTML('beforeend',`<div class="spotLayer">${pts.map((p,i)=>`<span class="spotPin" data-spot="${i}" style="left:${p[0]*100}%;top:${p[1]*100}%">${i+1}</span>`).join('')}</div>`)},
+    pick(i){cv.querySelectorAll('.spotPin').forEach(el=>el.classList.toggle('picked',+el.dataset.spot===i))}};
 }
 
 // ================================================================ HOME
@@ -124,7 +133,7 @@ function buildHome(){
     if(e.target.closest('#browseReserves'))$('#reserveDirectory').scrollIntoView({behavior:'smooth',block:'start'});
     if(e.target.closest('#randomFish')){const rname=RESERVES[Math.floor(Math.random()*RESERVES.length)],fish=DATA.reserves[rname].fish;go(rname,fish[Math.floor(Math.random()*fish.length)])}
     if(e.target.closest('#clearHomeSearch')){$('#homeQuery').value='';$('#homeReserveFilter').value='';renderHomeResults('');$('#homeQuery').focus()}
-    const lg=e.target.closest('[data-legend]');if(lg)return nav('/guides/legendary/'+encodeURIComponent(lg.dataset.legend));
+    const lg=e.target.closest('[data-legend]');if(lg){jumpToSpots=true;return nav('/guides/legendary/'+encodeURIComponent(lg.dataset.legend))}
     const result=e.target.closest('[data-home-fish]');if(result){const [rname,...parts]=result.dataset.homeFish.split('::');go(rname,parts.join('::'))}
   };
   fillBaits();renderHomeResults('');renderThisWeek();
@@ -164,7 +173,7 @@ function rotation(now=Date.now()){
     return{key:new Date(start-864e5).toISOString().slice(0,10),start,end:start+w};
   }
 }
-let TW=null,TWat=0,twTimer=0;
+let TW=null,TWat=0,twTimer=0,jumpToSpots=false; // jumpToSpots: open the legendary page at its map
 function thisWeek(){ // the shared file, fetched fresh at most every 10 minutes
   if(!TW||Date.now()-TWat>6e5){TWat=Date.now();TW=fetch('./data/this-week.json',{cache:'no-cache'}).then(r=>{if(!r.ok)throw new Error(r.status);return r.json()}).catch(()=>{TWat=0;return{}})}
   return TW;
@@ -182,7 +191,7 @@ async function renderThisWeek(){
   const act=await activeLegends(),got=legendsCaught();if(!$('#twList'))return;
   box.innerHTML=RESERVES.map(rn=>{
     const here=L.filter(l=>l.reserves[0]===rn),a=act[rn],l=a&&here.find(x=>x.name===a.legendary);
-    if(l)return `<button class="twRow" data-legend="${esc(l.name)}"><img src="${l.image||''}" alt="" loading="lazy" onerror="imgFail(this)"><span><strong>${esc(l.name)}</strong><small>${esc(rn)}</small><small class="twSpot">📍 ${esc(a.spot||'Spot not confirmed yet')}</small></span>${got.has(l.name)?'<em>✓ Caught</em>':'<span aria-hidden="true">→</span>'}</button>`;
+    if(l)return `<button class="twRow" data-legend="${esc(l.name)}"><img src="${l.image||''}" alt="" loading="lazy" onerror="imgFail(this)"><span><strong>${esc(l.name)}</strong><small>${esc(rn)}</small><small class="twSpot">📍 ${a.spot&&!/not confirmed/i.test(a.spot)?esc(a.spot):`Spot not confirmed: one of ${(l.spots||[]).length||'its'} known spots`}</small></span>${got.has(l.name)?'<em>✓ Caught</em>':'<span aria-hidden="true">→</span>'}</button>`;
     return `<a class="twRow pending" href="#/guides/legendary"><img class="twLogo" src="${RIMG[rn]||''}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"><span><strong>${esc(rn)}</strong><small>Not confirmed yet${here.length?': one of '+esc(here.map(x=>x.name).join(', ')):''}</small></span><span aria-hidden="true">→</span></a>`;
   }).join('');
   clearTimeout(twTimer);twTimer=setTimeout(()=>{TW=null;renderThisWeek()},Math.min(rotation().end-Date.now()+5e3,864e5));
@@ -472,7 +481,8 @@ async function buildGuide(sub){
   }catch(e){gv.innerHTML=guideTitle('Guides','Guides')+loadFail}
 }
 gv.onclick=e=>{
-  const t=e.target,lg=t.closest('[data-legend]');if(lg)return nav('/guides/legendary/'+encodeURIComponent(lg.dataset.legend));
+  const t=e.target,gw=t.closest('[data-goto-where]');if(gw){e.preventDefault();$('#where')?.scrollIntoView({behavior:'smooth',block:'start'});return}
+  const lg=t.closest('[data-legend]');if(lg)return nav('/guides/legendary/'+encodeURIComponent(lg.dataset.legend));
   const fishLink=t.closest('[data-fishlink]');if(fishLink){const [rn,...p]=fishLink.dataset.fishlink.split('::');return go(rn,p.join('::'))}
   const lc=t.closest('#legendToggle');if(lc){const on=toggleLegend(lc.dataset.name);haptic(on?[15,30,15]:10);lc.classList.toggle('primary',!on);lc.textContent=on?'✓ Caught':'＋ Mark as caught';toast(on?lc.dataset.name+' marked as caught 👑':'Unmarked');return}
 };
@@ -493,14 +503,24 @@ async function buildLegend(name){
   <div class="detailgrid section"><div>
     <div class="card"><div class="imageWrap"><img class="heroimg" src="${l.image||''}" alt="${esc(l.name)}" onerror="imgFail(this)"></div>
       <div class="rows" style="margin-top:12px">${F('Weight',kgfmt(l.weight))}${F('Length',l.length)}${F('Spawn depth',sd(l.spawnDepth&&l.spawnDepth.replace(/m/g,'').replace(/\s*—\s*/,' – ')+' m'))}${F('Time of day',l.time)}${F('Preferred bait',l.preferred)}${F('Hook sizes',l.hooks.join(', '))}</div></div>
-    <div class="card" style="margin-top:18px"><h2>Where to find it</h2>${l.map?`<div class="map" id="lmap"></div><div class="note">Known spawn spots. Each week it's active, it appears at one of them.</div>`:'<div class="mutedBox">No location map is published for this legendary.</div>'}</div>
+    <div class="card" style="margin-top:18px" id="where"><h2>Where to find it</h2>${l.map?`<div class="map legendMap" id="lmap"></div>
+      ${l.spots&&l.spots.length?`<p class="note"><strong>${l.spots.length} known spawn spot${l.spots.length>1?'s':''}.</strong> Each week it's active, it appears at one of them. Tap a number to zoom in.</p>
+      <div class="spotChips">${l.spots.map((_,i)=>`<button class="chip" data-spotgo="${i}">📍 ${i+1}</button>`).join('')}${l.spots.length>1?'<button class="chip" data-spotgo="all">Show all</button>':''}</div>`
+      :`<div class="note">Known spawn spots are marked in green. Each week it's active, it appears at one of them.</div>`}`:'<div class="mutedBox">No location map is published for this legendary.</div>'}</div>
   </div><div>
     <div class="card"><h2>The legend</h2>${l.story.map(p=>`<p class="story">${esc(p)}</p>`).join('')}</div>
     <div class="card" style="margin-top:18px"><h2>Bait &amp; lure preferences</h2>${tiers.map(p=>`<div class="tier">${p}%</div>`+l.baits.filter(b=>b[1]===p).map(b=>`<span class="tag${b[0]===l.preferred?' pref':''}">${b[0]===l.preferred?'★ ':''}${esc(b[0])}</span>`).join('')).join('')||'<div class="mutedBox">Not listed.</div>'}</div>
     <div class="card" style="margin-top:18px"><h2>Traits</h2>${l.traits.length?`<ul class="traitList">${l.traits.map(t=>`<li><strong>${esc(t.name)}</strong><span>${esc(t.desc)}</span></li>`).join('')}</ul>`:'<div class="mutedBox">Not listed.</div>'}</div>
   </div></div><div class="source">Source: <a href="${l.source}" target="_blank" rel="noopener">The Angler Wiki</a> (community-maintained; may contain errors).</div>`;
-  if(l.map)mkMap($('#lmap'),l.map);
+  if(l.map){
+    const m=mkMap($('#lmap'),l.map),sp=l.spots||[];
+    if(sp.length){m.pins(sp);requestAnimationFrame(()=>m.fit(sp));
+      $('#where').onclick=e=>{const b=e.target.closest('[data-spotgo]');if(!b)return;const v=b.dataset.spotgo;
+        $('#where').querySelectorAll('[data-spotgo]').forEach(x=>x.classList.toggle('active',x===b));
+        if(v==='all'){m.pick(-1);m.fit(sp)}else{m.pick(+v);m.focus(sp[v][0],sp[v][1],3)}}}
+  }
   catchGuide(l,L);
+  if(jumpToSpots){jumpToSpots=false;setTimeout(()=>$('#where')?.scrollIntoView({block:'start'}),60)}
   const a=(await activeLegends())[rn];
   if(a&&a.legendary===l.name&&screen==='legend'){const st=$('.hero .stats',gv);if(st)st.insertAdjacentHTML('afterbegin',`<div class="pill twPill">📍 Active this week${a.spot?': '+esc(a.spot):''}</div>`)}
 }
@@ -572,7 +592,7 @@ async function catchGuide(l,L){
   const others=L.filter(x=>x.reserves[0]===l.reserves[0]&&x.name!==l.name).map(x=>x.name);
   box.innerHTML=`<h2>How to catch ${esc(l.name)}</h2><ol class="cgSteps">
     <li><strong>Fish in its week.</strong> Each week one legendary is active in ${esc(l.reserves[0])}, picked at random${others.length?` from ${esc(l.name)}, ${esc(others.join(' and '))}`:''}. It changes every Wednesday at 10 pm US Eastern time, and each active legendary can only be caught once that week. ${where}</li>
-    <li><strong>Go to its spawn spots.</strong> ${l.map?'The map below shows the known spots. Each active week it appears at one of them, so work through them until you find it.':'No location map is published, so search its species\' usual water in this reserve.'}</li>
+    <li><strong>Go to its spawn spots.</strong> ${l.map?(l.spots&&l.spots.length?`It has <strong>${l.spots.length} known spot${l.spots.length>1?'s':''}</strong>, numbered on the map below. Each active week it appears at one of them, so work through them until you find it. <a href="#" data-goto-where>Show the spots ↓</a>`:'The map below shows the known spots. Each active week it appears at one of them, so work through them until you find it.'):'No location map is published, so search its species\' usual water in this reserve.'}</li>
     <li><strong>Pick your time.</strong> ${esc(when)}.${trait('Night Owl')?' It\'s most active at night.':''}${trait('Sun Lover')?' It\'s most active after sunrise.':''}</li>
     <li><strong>Fish the right depth.</strong> It spawns ${dMin!=null?`between ${sd(dMin+' m')} and ${sd((dMax??dMin)+' m')}`:'at an unknown depth'}. ${trait('Bottom Lurker')||deep?'Get your bait down near the bottom.':'Set your float or let your lure sink into that range.'}</li>
     <li><strong>Use its favourite ${naturals.length&&lures.length?'baits and lures':lures.length?'lures':'baits'}.</strong> ${top.length?`These have the best bite chance (${top[0][1]}%):`:'No bait preferences are listed.'}
