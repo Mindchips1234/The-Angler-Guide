@@ -4,7 +4,7 @@ const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelecto
 const store={get(k,d){try{return localStorage.getItem('ag2.'+k)||d}catch(e){return d}},set(k,v){try{localStorage.setItem('ag2.'+k,v)}catch(e){}}};
 const jget=(k,d)=>{try{const v=JSON.parse(store.get(k,''));return v==null?d:v}catch(e){return d}},jset=(k,v)=>store.set(k,JSON.stringify(v));
 const REGION={'Izilo Zasendulo':'Mpumalanga, South Africa'};
-const APP_VERSION='3.5',reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const APP_VERSION='3.6',reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
 let unit=store.get('unit','metric'),tu=store.get('temp','celsius'),R=null,lastFish=null,built=null,scrollRv=0,hmap=null;
 const home=$('#home'),rv=$('#rv'),fv=$('#fv'),lv=$('#lv'),gv=$('#gv'),back=$('#back'),sel=$('#rsel');
 const haptic=(ms=10)=>{try{navigator.vibrate&&navigator.vibrate(ms)}catch(e){}};
@@ -180,6 +180,7 @@ function thisWeek(){ // the shared file, fetched fresh at most every 10 minutes
 }
 // Confirmed legendary and spot per reserve for the current week ({} until someone confirms them).
 async function activeLegends(){const d=await thisWeek(),rot=rotation();return d&&d.week===rot.key&&d.reserves?d.reserves:{}}
+const spotKnown=s=>!!s&&!/not confirmed/i.test(s); // the weekly file says "Spot not confirmed yet" until someone finds it
 function untilText(ms){const m=Math.max(1,Math.round(ms/6e4)),d=Math.floor(m/1440),h=Math.floor(m%1440/60),mm=m%60;return d?`${d}d ${h}h`:h?`${h}h ${mm}m`:`${mm}m`}
 function renderTwWhen(){
   const el=$('#twWhen');if(!el)return;const r=rotation(),day=t=>new Date(t).toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'});
@@ -191,7 +192,7 @@ async function renderThisWeek(){
   const act=await activeLegends(),got=legendsCaught();if(!$('#twList'))return;
   box.innerHTML=RESERVES.map(rn=>{
     const here=L.filter(l=>l.reserves[0]===rn),a=act[rn],l=a&&here.find(x=>x.name===a.legendary);
-    if(l)return `<button class="twRow" data-legend="${esc(l.name)}"><img src="${l.image||''}" alt="" loading="lazy" onerror="imgFail(this)"><span><strong>${esc(l.name)}</strong><small>${esc(rn)}</small><small class="twSpot">📍 ${a.spot&&!/not confirmed/i.test(a.spot)?esc(a.spot):`Spot not confirmed: one of ${(l.spots||[]).length||'its'} known spots`}</small></span>${got.has(l.name)?'<em>✓ Caught</em>':'<span aria-hidden="true">→</span>'}</button>`;
+    if(l)return `<button class="twRow" data-legend="${esc(l.name)}"><img src="${l.image||''}" alt="" loading="lazy" onerror="imgFail(this)"><span><strong>${esc(l.name)}</strong><small>${esc(rn)}</small><small class="twSpot">📍 ${spotKnown(a.spot)?esc(a.spot):`Spot not confirmed: one of ${(l.spots||[]).length||'its'} known spots`}</small></span>${got.has(l.name)?'<em>✓ Caught</em>':'<span aria-hidden="true">→</span>'}</button>`;
     return `<a class="twRow pending" href="#/guides/legendary"><img class="twLogo" src="${RIMG[rn]||''}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"><span><strong>${esc(rn)}</strong><small>Not confirmed yet${here.length?': one of '+esc(here.map(x=>x.name).join(', ')):''}</small></span><span aria-hidden="true">→</span></a>`;
   }).join('');
   clearTimeout(twTimer);twTimer=setTimeout(()=>{TW=null;renderThisWeek()},Math.min(rotation().end-Date.now()+5e3,864e5));
@@ -487,10 +488,11 @@ gv.onclick=e=>{
   const lc=t.closest('#legendToggle');if(lc){const on=toggleLegend(lc.dataset.name);haptic(on?[15,30,15]:10);lc.classList.toggle('primary',!on);lc.textContent=on?'✓ Caught':'＋ Mark as caught';toast(on?lc.dataset.name+' marked as caught 👑':'Unmarked');return}
 };
 
+let legendBuild=0; // the newest buildLegend call; older ones stop after their next await
 async function buildLegend(name){
-  gv.innerHTML=guideTitle('Legendary fish','Loading…');
+  const run=++legendBuild;gv.innerHTML=guideTitle('Legendary fish','Loading…');
   let L;try{L=await guide('legendary')}catch(e){gv.innerHTML=guideTitle('Legendary fish',esc(name))+loadFail;return}
-  if(screen!=='legend')return;
+  if(screen!=='legend'||run!==legendBuild)return;
   const l=L.find(x=>x.name===name);if(!l){nav('/guides/legendary');return}
   const got=legendsCaught().has(l.name),rn=l.reserves[0],fishHere=l.species&&DATA.reserves[rn]?.records[l.species]?l.species:null;
   const F=(a,b)=>`<div class="row"><small>${a}</small><strong>${esc(b||'—')}</strong></div>`;
@@ -522,7 +524,7 @@ async function buildLegend(name){
   catchGuide(l,L);
   if(jumpToSpots){jumpToSpots=false;setTimeout(()=>$('#where')?.scrollIntoView({block:'start'}),60)}
   const a=(await activeLegends())[rn];
-  if(a&&a.legendary===l.name&&screen==='legend'){const st=$('.hero .stats',gv);if(st)st.insertAdjacentHTML('afterbegin',`<div class="pill twPill">📍 Active this week${a.spot?': '+esc(a.spot):''}</div>`)}
+  if(a&&a.legendary===l.name&&screen==='legend'&&run===legendBuild){const st=$('.hero .stats',gv);if(st)st.insertAdjacentHTML('afterbegin',`<div class="pill twPill">📍 Active this week${spotKnown(a.spot)?': '+esc(a.spot):', spot not confirmed'}</div>`)}
 }
 
 // ------------------------------------------------------------ legendary catching guide
@@ -587,7 +589,7 @@ async function catchGuide(l,L){
       <div class="row"><small>Hooks</small><strong>${esc(l.hooks.join(', ')||'Not listed')}</strong></div></div>
       ${over?`<p class="note">No ${rig[0].toLowerCase()} rig setup is rated for its full weight, so use the strongest line your rod takes and play it carefully: keep the drag below the line rating and let it tire itself out. Landing a fish heavier than the line multiplies your score.</p>`:''}</li>`;
   }
-  const where=act&&act.legendary===l.name?`It's <strong>active this week</strong>${act.spot?` at <strong>${esc(act.spot)}</strong>`:''}.`
+  const where=act&&act.legendary===l.name?`It's <strong>active this week</strong>${spotKnown(act.spot)?` at <strong>${esc(act.spot)}</strong>.`:`. Its spot for this week isn't confirmed yet, so try its known spots on the map below.`}`
     :act&&act.legendary?`This week's ${esc(l.reserves[0])} legendary is ${esc(act.legendary)}, so ${esc(l.name)} isn't active until a later week.`:`This week's legendary in ${esc(l.reserves[0])} isn't confirmed yet. Check the Home screen.`;
   const others=L.filter(x=>x.reserves[0]===l.reserves[0]&&x.name!==l.name).map(x=>x.name);
   box.innerHTML=`<h2>How to catch ${esc(l.name)}</h2><ol class="cgSteps">
