@@ -1,4 +1,4 @@
-# Angler Guide 3.3
+# Angler Guide 3.4
 
 A fan-made, offline-ready field guide for the game *The Angler*, made by Vanderholst Studios. It covers all five reserves, 96 fish entries (84 species), 15 legendary fish, 313 missions, 247 collectibles and 175 pieces of gear, with a 3D model of every species and a log for everything you catch.
 
@@ -46,6 +46,7 @@ Also: an intro animation on launch (tap to skip), sliding screen transitions, sw
 | `vendor/three.module.min.js` | [Three.js](https://threejs.org/) r160 (MIT licence, see `vendor/three-LICENSE.txt`), loaded for the 3D models |
 | `service-worker.js` | Offline support and updates: app files open from the cache and refresh in the background; pictures and maps are cached once seen |
 | `manifest.webmanifest` | Install metadata, icons and home-screen shortcuts (My log, Guides) |
+| `favicon.ico`, `icon-*.png`, `apple-touch-icon.png`, `mstile-150x150.png`, `browserconfig.xml` | App and browser icons: the round emblem for tabs, the full logo on a white tile for pinned sites, Edge/Windows tiles and the installed app. Rebuild them all with `python3 tools/make-icons.py` (from `tools/icon-src/logo-512.png`) |
 | `tools/` | Scripts that rebuild the data and images (see below) |
 
 ## Rebuilding the data
@@ -72,7 +73,7 @@ The app re-checks `data/this-week.json` whenever it's opened. It works out the r
 
 ## Releasing
 
-1. Bump `V` in `service-worker.js` (e.g. `angler-guide-v3-3`). This is what makes installed copies show the update banner.
+1. Bump `V` in `service-worker.js` (e.g. `angler-guide-v3-4`). This is what makes installed copies show the update banner.
 2. Update `APP_VERSION` in `app.js` so Settings shows the right version.
 
 ## Credits
