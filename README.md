@@ -1,4 +1,4 @@
-# Angler Guide 3.5
+# Angler Guide 3.6
 
 A fan-made, offline-ready field guide for the game *The Angler*, made by Vanderholst Studios. It covers all five reserves, 96 fish entries (84 species), 15 legendary fish, 313 missions, 247 collectibles and 175 pieces of gear, with a 3D model of every species and a log for everything you catch.
 
