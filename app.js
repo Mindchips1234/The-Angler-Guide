@@ -3,7 +3,7 @@
 const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)],esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 const store={get(k,d){try{return localStorage.getItem('ag2.'+k)||d}catch(e){return d}},set(k,v){try{localStorage.setItem('ag2.'+k,v)}catch(e){}}};
 const jget=(k,d)=>{try{const v=JSON.parse(store.get(k,''));return v==null?d:v}catch(e){return d}},jset=(k,v)=>store.set(k,JSON.stringify(v));
-const REGION={'Izilo Zasendulo':'Mpumalanga, South Africa'};
+const REGION={'Izilo Zasendulo':'Mpumalanga, South Africa','Golden Ridge Reserve':'USA (based on Wyoming)'}; // Golden Ridge has no state in the game
 const APP_VERSION='3.7',reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
 let unit=store.get('unit','metric'),tu=store.get('temp','celsius'),R=null,lastFish=null,built=null,scrollRv=0,hmap=null;
 const home=$('#home'),rv=$('#rv'),fv=$('#fv'),lv=$('#lv'),gv=$('#gv'),back=$('#back'),sel=$('#rsel');
