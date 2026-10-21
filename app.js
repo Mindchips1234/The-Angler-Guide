@@ -4,7 +4,7 @@ const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelecto
 const store={get(k,d){try{return localStorage.getItem('ag2.'+k)||d}catch(e){return d}},set(k,v){try{localStorage.setItem('ag2.'+k,v)}catch(e){}}};
 const jget=(k,d)=>{try{const v=JSON.parse(store.get(k,''));return v==null?d:v}catch(e){return d}},jset=(k,v)=>store.set(k,JSON.stringify(v));
 const REGION={'Izilo Zasendulo':'Mpumalanga, South Africa','Golden Ridge Reserve':'USA (based on Wyoming)'}; // Golden Ridge has no state in the game
-const APP_VERSION='3.9',reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const APP_VERSION='3.10',reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
 let unit=store.get('unit','metric'),tu=store.get('temp','celsius'),R=null,lastFish=null,built=null,scrollRv=0,hmap=null;
 const home=$('#home'),rv=$('#rv'),fv=$('#fv'),lv=$('#lv'),gv=$('#gv'),back=$('#back'),sel=$('#rsel');
 const haptic=(ms=10)=>{try{navigator.vibrate&&navigator.vibrate(ms)}catch(e){}};
@@ -649,11 +649,12 @@ async function buildChecklist(kind){
   +`<div class="chipRow">${RESERVES.map(n=>`<button class="chip${n===rn?' active':''}" data-ck-reserve="${esc(n)}">${esc(n.replace(/ (Reserve|Nature Reserve|National Park|Municipio)$/,''))}</button>`).join('')}</div>
   <div class="card ckSummary"><div><strong>${doneHere} of ${all.length}</strong> ${isM?'missions':'collectibles'} done in ${esc(rn)}${isM?` · ${xp.toLocaleString()} of ${xpAll.toLocaleString()} XP`:''}</div><span class="bar"><i style="width:${all.length?doneHere/all.length*100:0}%"></i></span>
   <label class="switchLabel"><input type="checkbox" id="ckHide"${hide?' checked':''}> Hide finished</label></div>
+  ${isM?'':'<p class="note ckLocNote">📍 Exact locations aren\'t published yet. The Angler Wiki has recorded them but hasn\'t released its map, so they\'ll be added here once it does. Tap a name for its in-game description and picture on the wiki.</p>'}
   ${groups.length?groups.map(g=>{const its=items(g),gd=its.filter(n=>done[id(g.type,n)]).length;
     const rows=isM?g.missions.filter(m=>!(hide&&done[id(g.type,m.name)])).map(m=>{const k=id(g.type,m.name);
       return `<details class="ckRow${done[k]?' done':''}"><summary><button class="ckBox" data-ck="${esc(k)}" role="checkbox" aria-checked="${!!done[k]}" aria-label="Done: ${esc(m.name)}"></button><span class="ckName">${esc(m.name)}</span><span class="ckMeta">${m.xp?`⭐ ${m.xp} XP`:''}${m.credits?` · 💰 ${m.credits}`:''}${m.rep?` · 🎖️ ${m.rep}`:''}</span></summary>
         <div class="ckBody">${m.desc?`<p>${esc(m.desc)}</p>`:''}${m.objectives.length?`<ol>${m.objectives.map(o=>`<li>${esc(o)}</li>`).join('')}</ol>`:''}</div></details>`}).join('')
-      :g.items.filter(n=>!(hide&&done[id(g.type,n)])).map(n=>{const k=id(g.type,n);return `<div class="ckRow plain${done[k]?' done':''}"><button class="ckBox" data-ck="${esc(k)}" role="checkbox" aria-checked="${!!done[k]}" aria-label="Found: ${esc(n)}"></button><span class="ckName">${esc(n)}</span></div>`}).join('');
+      :g.items.filter(n=>!(hide&&done[id(g.type,n)])).map(n=>{const k=id(g.type,n),slug=(g.links||[])[g.items.indexOf(n)];return `<div class="ckRow plain${done[k]?' done':''}"><button class="ckBox" data-ck="${esc(k)}" role="checkbox" aria-checked="${!!done[k]}" aria-label="Found: ${esc(n)}"></button>${slug?`<a class="ckName ckLink" href="https://theangler.org/collectibles/${esc(slug)}" target="_blank" rel="noopener" title="Open ${esc(n)} on The Angler Wiki">${esc(n)} <span aria-hidden="true">↗</span></a>`:`<span class="ckName">${esc(n)}</span>`}</div>`}).join('');
     return `<section class="card ckGroup"><h2>${esc(g.type)} <span class="muted">${gd}/${its.length}</span></h2>${g.about?`<p class="note">${esc(g.about)}</p>`:''}${rows||'<div class="mutedBox">All done here. 🎉</div>'}</section>`}).join(''):'<div class="mutedBox">Nothing listed for this reserve.</div>'}
   <div class="source">Source: <a href="https://theangler.org/${isM?'missions':'collectibles'}" target="_blank" rel="noopener">The Angler Wiki</a> (community-maintained; may contain errors).</div>`;
   gv.onchange=e=>{if(e.target.id==='ckHide'){store.set(key+'Hide',e.target.checked?'1':'');buildChecklist(kind)}};
