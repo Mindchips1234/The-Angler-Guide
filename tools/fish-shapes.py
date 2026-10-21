@@ -4,13 +4,16 @@ Usage:  python3 tools/fish-shapes.py <pictures-dir> fish-tex fish-shapes.js [pre
 
 <pictures-dir> holds the 1024x484 wiki pictures saved as <Fish-Name>.webp
 (the fish name with every run of non-letters/digits replaced by "-", e.g.
-Tiger-Muskie-Muskellunge.webp). Needs numpy, scipy and Pillow.
+Tiger-Muskie-Muskellunge.webp). Needs numpy, scipy and Pillow. Fish missing from
+<pictures-dir> keep their existing outline in fish-shapes.js, so a few can be rebuilt alone.
+The app's own copies in img/fish/ work as pictures once renamed (they are re-encoded, so a full
+rebuild from them shifts every texture slightly; rebuild only the fish that need it).
 For each fish this cuts it out of the navy background, saves a 512 px wide
 texture, and traces the body outline with the fins removed.
 """
 import sys, os, json, glob
 import numpy as np
-from PIL import Image, ImageFilter
+from PIL import Image
 from scipy import ndimage as ndi
 
 src, out_tex, out_js = sys.argv[1:4]; preview = sys.argv[4] if len(sys.argv) > 4 else None
@@ -30,7 +33,18 @@ for f in sorted(glob.glob(os.path.join(src, '*.webp'))):
     im = Image.open(f).convert('RGB'); a = np.asarray(im).astype(float)
     r, g, b = a[..., 0], a[..., 1], a[..., 2]
     blue = b - (r + g) / 2; lum = .3*r + .59*g + .11*b
-    fg = (blue < 15) | (lum > 95)
+    # Model the background (navy, with a vignette and the odd darker patch) from the pixels that
+    # are plainly background, then call anything that stands out from it fish. Colour rules alone
+    # lose pale bluish heads and fins and keep dark background patches.
+    clear = (lum < 45) & (blue > 10); clear[425:, :560] = True
+    w = ndi.gaussian_filter(clear.astype(float), 24)
+    bgc = np.dstack([ndi.gaussian_filter(a[..., c] * clear, 24) for c in range(3)]) / np.maximum(w, 1e-6)[..., None]
+    diff = np.sqrt(((ndi.median_filter(a, size=(5, 5, 1)) - bgc)**2).sum(-1))  # median drops dither specks
+    fg = diff > 16
+    # The median also drops barbels and fin rays a pixel or two wide; take back strong, long runs.
+    strong = (np.sqrt(((a - bgc)**2).sum(-1)) > 24) | ((blue < 5) & (lum > 22))   # dark barbels: not navy in hue
+    ls, ns = ndi.label(strong, np.ones((3, 3)))
+    if ns: fg |= np.isin(ls, 1 + np.nonzero(ndi.sum(strong, ls, range(1, ns+1)) >= 40)[0])
     fg[425:, :560] = False                      # species name label
     fg = ndi.binary_opening(fg, disk(1))        # specks
     fg = ndi.binary_closing(fg, disk(3))
@@ -44,11 +58,23 @@ for f in sorted(glob.glob(os.path.join(src, '*.webp'))):
     mask = ndi.binary_fill_holes(keep)
     ys, xs = np.nonzero(mask); x0, x1, y0, y1 = xs.min(), xs.max(), ys.min(), ys.max()
     pad = 6; x0 = max(0, x0-pad); y0 = max(0, y0-pad); x1 = min(1023, x1+pad); y1 = min(483, y1+pad)
-    m = mask[y0:y1+1, x0:x1+1]; rgb = a[y0:y1+1, x0:x1+1]
-    # Soft edge, and bleed colours outward so texture filtering never pulls in the background.
-    alpha = np.asarray(Image.fromarray((m*255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(.8))).astype(float)
-    alpha = np.where(m, np.maximum(alpha, 200), alpha)
-    _, (iy, ix) = ndi.distance_transform_edt(~ndi.binary_erosion(m, disk(1)), return_indices=True)
+    m = mask[y0:y1+1, x0:x1+1]; rgb = a[y0:y1+1, x0:x1+1]; bgm = bgc[y0:y1+1, x0:x1+1]
+    # Edge alpha: how far each pixel sits between the background and the nearest solid fish
+    # colour, so see-through fin edges fade smoothly instead of breaking into jags, and edge
+    # pixels lose their navy tint. Nothing away from the fish is kept.
+    core = ndi.binary_erosion(m, disk(3))
+    dcore, (iy, ix) = ndi.distance_transform_edt(~core, return_indices=True)
+    fc = rgb[iy, ix]; fb = fc - bgm
+    cov = ((rgb - bgm) * fb).sum(-1) / np.maximum((fb * fb).sum(-1), 400)
+    alpha = np.clip(cov, 0, 1) * ndi.binary_dilation(m, disk(2))
+    # Barbels and thin rays are far from any solid part, whose colour says nothing about them.
+    alpha = np.where(m & (dcore > 3), np.maximum(alpha, .75), alpha)
+    alpha = np.where(core, 1, alpha)
+    ak = np.maximum(alpha, .6)[..., None]   # unmix lightly: fins are drawn solid, so faint ones must not turn vivid
+    rgb = np.where(core[..., None], rgb, (bgm + (rgb - bgm) / ak).clip(0, 255))
+    alpha = ndi.gaussian_filter(alpha, .6) * 255
+    # Bleed colours outward so texture filtering never pulls in the background.
+    _, (iy, ix) = ndi.distance_transform_edt(alpha < 128, return_indices=True)
     bled = rgb[iy, ix]
     H, W = m.shape
     # Body = mask with thin parts (fins, barbels, tail lobes) opened away.
@@ -115,6 +141,11 @@ for f in sorted(glob.glob(os.path.join(src, '*.webp'))):
     for y in range(H):
         for dx in (0, 1): px[min(W-1, int(ped)+dx), y] = (0, 255, 255)
     pv.save(os.path.join(preview, slug + '.png'))
+# Pictures not given this run keep their saved outline, so a few fish can be rebuilt on their own.
+if os.path.exists(out_js):
+    old = json.loads(open(out_js).read().split('export default ', 1)[1].rstrip().rstrip(';'))
+    shapes = {**old, **shapes}
+shapes = dict(sorted(shapes.items()))
 with open(out_js, 'w') as fh:
     fh.write("// Generated by tools/fish-shapes.py from the wiki fish pictures: outline of each fish's body\n")
     fh.write("// in picture pixels (w,h: picture size; x: samples snout to tail base; t,b: top and bottom edges).\n")
