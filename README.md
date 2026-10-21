@@ -1,6 +1,6 @@
-# Angler Guide 3.6
+# Angler Guide 3.7
 
-A fan-made, offline-ready field guide for the game *The Angler*, made by Vanderholst Studios. It covers all five reserves, 96 fish entries (84 species), 15 legendary fish, 313 missions, 247 collectibles and 175 pieces of gear, with a 3D model of every species and a log for everything you catch.
+Angler Guide, by Vanderholst Studios, is a fan-made, offline-ready field guide for the game *Call of the Wild: The Angler*. It is not affiliated with the game's developers. It covers all five reserves, 96 fish entries (84 species), 15 legendary fish, 313 missions, 247 collectibles and 175 pieces of gear, with a 3D model of every species and a log for everything you catch.
 
 The game's development ended in January 2025, so this data is complete. Every picture and map is stored in the app, so it keeps working even if the wiki it came from goes offline.
 
@@ -23,9 +23,9 @@ Five tabs on phones (header buttons on larger screens):
 | --- | --- |
 | **Home** | **This week's legendaries** (the active legendary and its spawn spot in each reserve, with a countdown to the next rotation), search every fish, **What's biting?** (pick a reserve, time of day, water temperature and bait; it ranks the fish most likely to bite), and the reserve list |
 | **Reserves** | Interactive map with hotspot overlays, the reserve's legendary fish, and a filterable fish list. Each fish page has bait preferences, traits, a hotspot map, a **rank table with the weight range and hook size for every rank**, the 3D model (tap the picture) and a **Log a catch** button |
-| **Log** | Your catches with weight, rank (worked out from the weight), score and date (enter the weight in kg, g, lb or oz; a weight above the fish's maximum is flagged as invalid); fish caught, Diamonds and legendaries counters; a collection of every fish showing your best rank and personal best; share any catch as a picture |
+| **Log** | Your catches with weight, rank (worked out from the weight), score and date, each editable (enter the weight in kg, g, lb or oz; a weight above the fish's maximum is flagged as invalid); fish caught, Diamonds and legendaries counters; a collection of every fish showing your best rank and personal best; share any catch as a picture |
 | **Guides** | **Legendary fish** (every known spawn spot numbered on its map, with buttons to zoom to each; a step-by-step catching plan for each one with time, depth, baits, rig, suggested line, rod and reel, and tips for its traits; plus story, location map and a caught tracker), **Missions** and **Collectibles** (tick-off lists per reserve, missions with objectives and rewards), **Gear guide** (every rod, reel, line and hook, plus a setup helper that suggests hooks, line and rods for any fish and rank), and links to the community records hub and the wiki |
-| **Settings** | Metric/imperial, °C/°F, dark/light/match-device theme, back up and restore your progress, replay the intro |
+| **Settings** | Metric/imperial, °C/°F, dark/light/match-device theme, back up and restore your progress, clear your data, replay the intro |
 
 Your log, legendaries, missions and collectibles are saved on the device only. Use **Settings → Save backup** before changing phones or clearing your browser, and **Restore backup** to bring them back.
 
@@ -54,7 +54,8 @@ Also: an intro animation on launch (tap to skip), sliding screen transitions, sw
 All data comes from [The Angler Wiki](https://theangler.org/). The scripts need Python 3 with `beautifulsoup4`, `lxml`, `Pillow` (and `numpy`, `scipy` for the 3D shapes).
 
 1. `python3 tools/wiki-data.py` – downloads legendaries, missions, collectibles, gear and the latest fish facts into `data/` (pages are cached in `.wiki-cache/`).
-2. `python3 tools/apply-fish-refresh.py` – merges the latest rank tables (weights and hooks) and traits into `data/fish-data.js`.
+   To refresh only the fish facts: `python3 tools/wiki-data.py .wiki-cache fish-refresh`.
+2. `python3 tools/apply-fish-refresh.py` – merges the latest rank tables (weights and hooks), traits, baits, preferred bait, time of day, habitats, spawn depth and max water depth into `data/fish-data.js`. A fish with no preferred bait on the wiki shows "Not listed".
 3. `python3 tools/bundle-images.py` – saves any new pictures and maps into `img/` and points the data at them.
 4. `python3 tools/legend-spots.py` – finds the spawn-spot markers on each legendary's location map and saves their positions in `data/legendary.json` (add `--debug <folder>` to check them). Run it after the step above, since it reads the saved maps.
 5. `python3 tools/fish-shapes.py <pictures-folder> fish-tex fish-shapes.js` – rebuilds the 3D textures and outlines (see the notes at the top of the script).
@@ -66,7 +67,8 @@ Each reserve has one legendary active per week, at one of its known spawn spots.
 Once it's confirmed, record it and push to `main`:
 
 ```sh
-python3 tools/this-week.py "Golden Ridge Reserve" Goldstein "Gravy Bubble"
+python3 tools/this-week.py "Golden Ridge Reserve" Goldstein 3          # spot = pin 3 on its map
+python3 tools/this-week.py "Golden Ridge Reserve" Goldstein "Gravy Bubble"   # or a description
 python3 tools/this-week.py              # shows what's set for the current week
 ```
 
@@ -79,4 +81,4 @@ The app re-checks `data/this-week.json` whenever it's opened. It works out the r
 
 ## Credits
 
-Fish data, legendaries, missions, collectibles, gear, pictures and maps come from [The Angler Wiki](https://theangler.org/) (community-maintained; may contain errors). The images in `img/` and the 3D textures in `fish-tex/` are copies of, or cut from, the wiki's pictures. Community records link to [The Angler Hub](https://hub.theangler.org). This project is not affiliated with the game's developers.
+Fish data, legendaries, missions, collectibles, gear, pictures and maps come from [The Angler Wiki](https://theangler.org/) (community-maintained; may contain errors). The images in `img/` and the 3D textures in `fish-tex/` are copies of, or cut from, the wiki's pictures. Many of those pictures carry the wiki's faint "cotw.pro" watermark (cotw.pro is the wiki's own domain); it is left in place as their attribution. Community records link to [The Angler Hub](https://hub.theangler.org). This project is not affiliated with the game's developers.
