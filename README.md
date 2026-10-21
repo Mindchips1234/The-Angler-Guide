@@ -1,4 +1,4 @@
-# Angler Guide 3.9
+# Angler Guide 3.10
 
 Angler Guide, by Vanderholst Studios, is a fan-made, offline-ready field guide for the game *Call of the Wild: The Angler*. It is not affiliated with the game's developers. It covers all five reserves, 96 fish entries (84 species), 15 legendary fish, 313 missions, 247 collectibles and 175 pieces of gear, with a 3D model of every species and a log for everything you catch.
 
