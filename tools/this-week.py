@@ -8,7 +8,12 @@ and ignores entries from an earlier week, so a stale file never shows old spots.
 
 Usage:
   python3 tools/this-week.py                                   show the current week and entries
+  python3 tools/this-week.py "Golden Ridge Reserve" Goldstein 3 [source-url]
   python3 tools/this-week.py "Golden Ridge Reserve" Goldstein "Gravy Bubble" [source-url]
+  python3 tools/this-week.py "Golden Ridge Reserve" Goldstein "Spot not confirmed yet" [source-url]
+
+The spot is best given as the number of its pin on the legendary's map in the app (1, 2, 3...):
+the app then highlights that pin. A name or description also works, but can't be shown on the map.
   python3 tools/this-week.py "Golden Ridge Reserve" --clear    remove a reserve's entry
 """
 import json, os, sys
@@ -44,6 +49,10 @@ def main(args):
             name, spot = args[1], args[2]
             if name not in here: sys.exit(f'{name} is not a {rn} legendary. Pick one of: {", ".join(here)}')
             entry = {'legendary': name, 'spot': spot}
+            if spot.isdigit():  # a pin number on the legendary's map
+                pins = len(next(l for l in legends if l['name'] == name).get('spots') or [])
+                if not 1 <= int(spot) <= pins: sys.exit(f'{name} has {pins} numbered spots; pick 1 to {pins}')
+                entry = {'legendary': name, 'spot': f'Spot {spot}', 'pin': int(spot)}
             if len(args) > 3: entry['source'] = args[3]
             data['reserves'][rn] = entry
         data['updated'] = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%MZ')

@@ -4,7 +4,7 @@ const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelecto
 const store={get(k,d){try{return localStorage.getItem('ag2.'+k)||d}catch(e){return d}},set(k,v){try{localStorage.setItem('ag2.'+k,v)}catch(e){}}};
 const jget=(k,d)=>{try{const v=JSON.parse(store.get(k,''));return v==null?d:v}catch(e){return d}},jset=(k,v)=>store.set(k,JSON.stringify(v));
 const REGION={'Izilo Zasendulo':'Mpumalanga, South Africa'};
-const APP_VERSION='3.6',reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const APP_VERSION='3.7',reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
 let unit=store.get('unit','metric'),tu=store.get('temp','celsius'),R=null,lastFish=null,built=null,scrollRv=0,hmap=null;
 const home=$('#home'),rv=$('#rv'),fv=$('#fv'),lv=$('#lv'),gv=$('#gv'),back=$('#back'),sel=$('#rsel');
 const haptic=(ms=10)=>{try{navigator.vibrate&&navigator.vibrate(ms)}catch(e){}};
@@ -20,6 +20,11 @@ const dn=n=>n==null?'—':unit==='metric'?n+' m':fmt(n*3.28084)+' ft';
 const tc=v=>v==null?'—':tu==='celsius'?fmt(v)+' °C':fmt(cf(v))+' °F';
 const trange=t=>!t||t.min==null?'—':tu==='celsius'?`${fmt(t.min)}–${fmt(t.max)} °C`:`${fmt(cf(t.min))}–${fmt(cf(t.max))} °F`;
 const rec=()=>DATA.reserves[R].records;
+// Weight range from the rank table (smallest Juvenile to heaviest Diamond), the same format for every reserve.
+const wrange=d=>{const rs=d.ranks||[];return rs.length&&rs[0].min!=null&&rs[rs.length-1].max!=null?kgfmt(rs[0].min)+' – '+kgfmt(rs[rs.length-1].max):wt(d.weight)};
+// The wiki names a lure type ("Spoon") as the preferred bait; the bait list has it per retrieve ("Spoon - Constant").
+const isPref=(b,pref)=>!!pref&&(b===pref||b.startsWith(pref+' - '));
+const prefText=d=>d.preferred||'Not listed';
 const match=(d,n,q)=>[n,...d.baits.map(b=>b[0]),...d.habitats,...(d.traits||[])].some(x=>x.toLowerCase().includes(q));
 const imgFail=i=>{const f=document.createElement('div');f.className='imgFallback';f.textContent='🐟';i.replaceWith(f)};
 const go=(r,f)=>{location.hash='/'+encodeURIComponent(r)+(f?'/'+encodeURIComponent(f):'')};
@@ -142,7 +147,7 @@ function renderHomeResults(query){
   const target=$('#homeResults');if(!target)return;
   const q=query.trim().toLowerCase(),selected=$('#homeReserveFilter').value;
   const names=selected?[selected]:RESERVES,matches=[];
-  for(const rn of names){const r=DATA.reserves[rn];for(const n of r.fish){if(!q||n.toLowerCase().includes(q)){const d=r.records[n]||{};matches.push({reserve:rn,fish:n,bait:d.preferred||(d.baits&&d.baits[0]&&d.baits[0][0])||'See fish guide'})}}}
+  for(const rn of names){const r=DATA.reserves[rn];for(const n of r.fish){if(!q||n.toLowerCase().includes(q)){const d=r.records[n]||{};matches.push({reserve:rn,fish:n,bait:prefText(d)})}}}
   $('#homeResultsCount').textContent=(q||selected)?(matches.length+' fish found'):'Search across all reserves';
   if(!q&&!selected){target.innerHTML='<div class="homeHint">Type a fish name or choose a reserve to browse its fish. Select any result to open its full guide.</div>';return}
   const shown=matches.slice(0,24);
@@ -181,6 +186,9 @@ function thisWeek(){ // the shared file, fetched fresh at most every 10 minutes
 // Confirmed legendary and spot per reserve for the current week ({} until someone confirms them).
 async function activeLegends(){const d=await thisWeek(),rot=rotation();return d&&d.week===rot.key&&d.reserves?d.reserves:{}}
 const spotKnown=s=>!!s&&!/not confirmed/i.test(s); // the weekly file says "Spot not confirmed yet" until someone finds it
+// The weekly entry can name the numbered pin on the legendary's map ("pin": 3); older entries only have text.
+const spotPin=(a,l)=>a&&Number.isInteger(a.pin)&&l&&l.spots&&a.pin>=1&&a.pin<=l.spots.length?a.pin:null;
+const spotLabel=(a,l)=>{const n=spotPin(a,l);return n?`spot ${n} on the map${spotKnown(a.spot)&&a.spot!=='Spot '+n?` (${a.spot})`:''}`:spotKnown(a.spot)?a.spot:null};
 function untilText(ms){const m=Math.max(1,Math.round(ms/6e4)),d=Math.floor(m/1440),h=Math.floor(m%1440/60),mm=m%60;return d?`${d}d ${h}h`:h?`${h}h ${mm}m`:`${mm}m`}
 function renderTwWhen(){
   const el=$('#twWhen');if(!el)return;const r=rotation(),day=t=>new Date(t).toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'});
@@ -192,7 +200,7 @@ async function renderThisWeek(){
   const act=await activeLegends(),got=legendsCaught();if(!$('#twList'))return;
   box.innerHTML=RESERVES.map(rn=>{
     const here=L.filter(l=>l.reserves[0]===rn),a=act[rn],l=a&&here.find(x=>x.name===a.legendary);
-    if(l)return `<button class="twRow" data-legend="${esc(l.name)}"><img src="${l.image||''}" alt="" loading="lazy" onerror="imgFail(this)"><span><strong>${esc(l.name)}</strong><small>${esc(rn)}</small><small class="twSpot">📍 ${spotKnown(a.spot)?esc(a.spot):`Spot not confirmed: one of ${(l.spots||[]).length||'its'} known spots`}</small></span>${got.has(l.name)?'<em>✓ Caught</em>':'<span aria-hidden="true">→</span>'}</button>`;
+    if(l)return `<button class="twRow" data-legend="${esc(l.name)}"><img src="${l.image||''}" alt="" loading="lazy" onerror="imgFail(this)"><span><strong>${esc(l.name)}</strong><small>${esc(rn)}</small><small class="twSpot">📍 ${spotLabel(a,l)?esc(spotLabel(a,l).replace(/^s/,'S')):`Spot not confirmed: one of ${(l.spots||[]).length||'its'} known spots`}</small></span>${got.has(l.name)?'<em>✓ Caught</em>':'<span aria-hidden="true">→</span>'}</button>`;
     return `<a class="twRow pending" href="#/guides/legendary"><img class="twLogo" src="${RIMG[rn]||''}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"><span><strong>${esc(rn)}</strong><small>Not confirmed yet${here.length?': one of '+esc(here.map(x=>x.name).join(', ')):''}</small></span><span aria-hidden="true">→</span></a>`;
   }).join('');
   clearTimeout(twTimer);twTimer=setTimeout(()=>{TW=null;renderThisWeek()},Math.min(rotation().end-Date.now()+5e3,864e5));
@@ -223,9 +231,12 @@ function renderBiting(){
   }
   rows.sort((a,b)=>b.s-a.s);
   const label=s=>s>=85?['Great','great']:s>=65?['Good','good']:s>=40?['Possible','ok']:['Unlikely','low'];
-  out.innerHTML=rows.length?rows.slice(0,8).map(x=>{const [l,c]=label(x.s),dia=(x.d.ranks||[]).find(r=>r.rank==='Diamond');
+  // Without a temperature or bait, time of day is the only thing to go on, so say so instead of
+  // presenting an alphabetical list as a ranking.
+  const likely=rows.filter(x=>x.s>=40).length,timeOnly=t==null&&!bait;
+  out.innerHTML=rows.length?(timeOnly?`<div class="homeHint bitingHint">Add the water temperature or the bait on your line to rank these. For now they're only sorted by time of day.</div>`:'')+rows.slice(0,8).map(x=>{const [l,c]=label(x.s),dia=(x.d.ranks||[]).find(r=>r.rank==='Diamond');
     return `<button class="bitingRow" data-bf="${esc(x.f)}"><span class="fit fit-${c}">${l}</span><span><strong>${esc(x.f)}</strong><small>${x.why.map(esc).join(' · ')}</small>${dia?`<small class="muted">💎 Diamond over ${kgfmt(dia.min)} · hook ${esc(dia.hooks.join(', '))}</small>`:''}</span><span aria-hidden="true">→</span></button>`}).join('')
-    +(rows.length>8?`<div class="homeHint">Top 8 of ${rows.length} fish that match.</div>`:''):'<div class="mutedBox">No fish in this reserve take that bait.</div>';
+    +(rows.length>8?`<div class="homeHint">Showing 8 of ${rows.length} fish${likely<rows.length?` (${likely} likely to bite)`:''}.</div>`:''):'<div class="mutedBox">No fish in this reserve take that bait.</div>';
   out.onclick=e=>{const b=e.target.closest('[data-bf]');if(b)go(rn,b.dataset.bf)};
 }
 
@@ -258,7 +269,7 @@ function renderGrid(){
   let list=r.fish.filter(n=>{const d=r.records[n];return(!q||match(d,n,q))&&(!tm||d.time.includes(tm))&&(!tp||(tp==='cool'?d.temperature.ideal<=10:d.temperature.ideal>10))&&(!bt||d.baits.some(b=>b[0]===bt))&&(!hb||d.habitats.includes(hb))});
   const pct=d=>(d.baits.find(b=>b[0]===bt)||[0,0])[1];if(bt)list.sort((a,b)=>pct(r.records[b])-pct(r.records[a]));
   $('#fcount').textContent=`${list.length} of ${r.fish.length} fish`;
-  $('#grid').innerHTML=list.map(n=>{const d=r.records[n],b=bestFor(R,n,log);return`<button class="fish" data-f="${esc(n)}"><div class="fishpic"><img src="${d.image}" alt="" loading="lazy" decoding="async" onerror="imgFail(this)">${b?`<span class="caughtTag">${b.rank?RANK_ICON[b.rank]:'✓'}</span>`:''}</div><div class="fishbody"><h3>${esc(n)}</h3><p>${esc(wt(d.weight))} · Ideal ${tc(d.temperature.ideal)}</p>${bt?`<div class="hit">${esc(bt)} · ${pct(d)}%</div>`:''}</div></button>`}).join('')||'<div class="mutedBox">No fish match those filters.</div>';
+  $('#grid').innerHTML=list.map(n=>{const d=r.records[n],b=bestFor(R,n,log);return`<button class="fish" data-f="${esc(n)}"><div class="fishpic"><img src="${d.image}" alt="" loading="lazy" decoding="async" onerror="imgFail(this)">${b?`<span class="caughtTag">${b.rank?RANK_ICON[b.rank]:'✓'}</span>`:''}</div><div class="fishbody"><h3>${esc(n)}</h3><p>${esc(wrange(d))} · Ideal ${tc(d.temperature.ideal)}</p>${bt?`<div class="hit">${esc(bt)} · ${pct(d)}%</div>`:''}</div></button>`}).join('')||'<div class="mutedBox">No fish match those filters.</div>';
 }
 function refresh(){
   $$('[data-u]').forEach(b=>b.classList.toggle('active',b.dataset.u===unit));$$('[data-t]').forEach(b=>b.classList.toggle('active',b.dataset.t===tu));
@@ -273,8 +284,8 @@ function refresh(){
 // ================================================================ FISH PAGE
 function fishDyn(f){
   const d=rec()[f],F=(a,b)=>`<div class="row"><small>${a}</small><strong>${esc(b)}</strong></div>`;
-  $('#fpills').innerHTML=`<div class="pill">🐟 ${esc(wt(d.weight))}</div><div class="pill">🌡️ Ideal ${tc(d.temperature.ideal)}</div><div class="pill">🕐 ${esc(d.time)}</div>`;
-  $('#ffacts').innerHTML=F('Preferred bait',d.preferred)+F('Best time',d.time)+F('Max weight',wt(d.weight))+F('Water temp',trange(d.temperature))+F('Ideal temp',tc(d.temperature.ideal))+F('Spawn depth',sd(d.spawnDepth))+F('Max water depth',dn(d.maxDepth));
+  $('#fpills').innerHTML=`<div class="pill">🐟 ${esc(wrange(d))}</div><div class="pill">🌡️ Ideal ${tc(d.temperature.ideal)}</div><div class="pill">🕐 ${esc(d.time)}</div>`;
+  $('#ffacts').innerHTML=F('Preferred bait',prefText(d))+F('Best time',d.time)+F('Weight range',wrange(d))+F('Water temp',trange(d.temperature))+F('Ideal temp',tc(d.temperature.ideal))+F('Spawn depth',sd(d.spawnDepth))+F('Max water depth',dn(d.maxDepth));
   const ranks=d.ranks||(d.hookRanks||[]).map(x=>({rank:x.rank,hooks:x.hooks})),lg=(DATA.legendaryHooks[R]||{})[f]||{};let unsold=false;
   const hooks=h=>h.length?h.map(x=>HOOK_NOT_SOLD.has(x)?(unsold=true,esc(x)+'*'):esc(x)).join(', '):'—';
   $('#franks').innerHTML=`<table class="hooks"><thead><tr><th>Rank</th><th>Weight</th><th>Hook</th></tr></thead><tbody>${ranks.map(x=>`<tr><td>${rankBadge(x.rank)}</td><td>${x.min!=null?`${kgfmt(x.min)} – ${kgfmt(x.max)}`:'—'}</td><td>${hooks(x.hooks)}</td></tr>`).join('')}${Object.entries(lg).map(([n,h])=>`<tr class="legendary-row"><td>${rankBadge('Legendary')}</td><td><a href="#/guides/legendary/${encodeURIComponent(n)}">${esc(n)}</a></td><td>${hooks(h)}</td></tr>`).join('')}</tbody></table>${unsold?'<div class="note">* Hook sizes above 4/0 are listed by the wiki but not sold in the shop.</div>':''}`;
@@ -285,7 +296,7 @@ function fishPage(f){
   if(built!==key){built=key;
     const tag=a=>(a&&a.length?a:[]).map(x=>`<span class="tag">${esc(x)}</span>`).join('')||'<div class="mutedBox">Not listed.</div>',
     tiers=[...new Set(d.baits.map(b=>b[1]))].sort((a,b)=>b-a),
-    baits=tiers.map(p=>`<div class="tier">${p}%</div>`+d.baits.filter(b=>b[1]===p).map(b=>`<span class="tag${b[0]===d.preferred?' pref':''}">${b[0]===d.preferred?'★ ':''}${esc(b[0])}</span>`).join('')).join('');
+    baits=tiers.map(p=>`<div class="tier">${p}%</div>`+d.baits.filter(b=>b[1]===p).map(b=>`<span class="tag${isPref(b[0],d.preferred)?' pref':''}">${isPref(b[0],d.preferred)?'★ ':''}${esc(b[0])}</span>`).join('')).join('');
     fv.innerHTML=`<div class="hero"><div class="eyebrow">${esc(R)} · Fish guide</div><h1>${esc(f)}</h1><div class="stats" id="fpills"></div><div class="fishTools"><button class="toolAction primary" id="logThis">＋ Log a catch</button><button class="toolAction" id="copyFishSetup">Copy fishing setup</button></div><div id="fbest" class="note"></div><div id="fishActionNote" class="note" aria-live="polite"></div></div><div class="detailgrid section"><div><div class="card"><button type="button" class="imageWrap open3d" id="open3d" aria-label="View ${esc(f)} in 3D" aria-haspopup="dialog"><img class="heroimg" src="${d.image}" alt="${esc(f)}" onerror="imgFail(this)"><span class="badge3d" aria-hidden="true">3D · Tap to view</span></button><div class="rows" id="ffacts" style="margin-top:12px"></div><div class="section"><h2>Habitat</h2>${tag(d.habitats)}</div></div><div class="card" style="margin-top:18px"><h2>Hotspot map</h2>${d.hotspotMap?`<div class="map" id="fmap"></div><div class="note">${esc(d.hotspotStatus||'')} Drag to pan, pinch or +/− to zoom.</div>`:'<div class="mutedBox">No hotspot map is published for this species yet.</div>'}</div></div><div><div class="card"><h2>Ranks, weights &amp; hooks</h2><div id="franks"></div></div><div class="card" style="margin-top:18px"><h2>Bait &amp; lure preferences</h2>${baits}</div><div class="card" style="margin-top:18px"><h2>Traits</h2>${tag(d.traits)}</div></div></div><div class="source">Source: <a href="${d.source}" target="_blank" rel="noopener">The Angler Wiki</a> (community-maintained; may contain errors).</div>`;
     if(d.hotspotMap)mkMap($('#fmap'),r.map).show(d.hotspotMap);
     import('./fish3d.js').catch(()=>{}); // warm up so the 3D pop-up opens quickly
@@ -294,7 +305,7 @@ function fishPage(f){
 }
 async function copyFishSetup(rn,fn){
   const d=DATA.reserves[rn]?.records[fn];if(!d)return;
-  const textOut='Angler Guide fishing setup\nReserve: '+rn+'\nTarget fish: '+fn+'\nPreferred bait: '+(d.preferred||'Not listed')+'\nBest time: '+(d.time||'Not listed')+'\nTop listed baits: '+d.baits.slice().sort((a,b)=>b[1]-a[1]).slice(0,5).map(b=>b[0]+' ('+b[1]+'%)').join(', ')+'\nHabitat: '+(d.habitats||[]).join(', ')+'\nSource: '+(d.source||'Angler Guide');
+  const textOut='Angler Guide fishing setup\nReserve: '+rn+'\nTarget fish: '+fn+'\nPreferred bait: '+prefText(d)+'\nBest time: '+(d.time||'Not listed')+'\nTop listed baits: '+d.baits.slice().sort((a,b)=>b[1]-a[1]).slice(0,5).map(b=>b[0]+' ('+b[1]+'%)').join(', ')+'\nHabitat: '+(d.habitats||[]).join(', ')+'\nSource: '+(d.source||'Angler Guide');
   const note=$('#fishActionNote');
   try{await navigator.clipboard.writeText(textOut);if(note)note.textContent='Fishing setup copied.'}
   catch(e){const area=document.createElement('textarea');area.value=textOut;area.style.position='fixed';area.style.opacity='0';document.body.appendChild(area);area.select();let ok=false;try{ok=document.execCommand('copy')}catch(_){}area.remove();if(note)note.textContent=ok?'Fishing setup copied.':'Copy is blocked by this browser. You can copy the setup from the fish guide manually.'}
@@ -334,11 +345,15 @@ dlg3d.addEventListener('click',e=>{const r=dlg3d.getBoundingClientRect(),out=e.t
 addEventListener('popstate',()=>{if(skipPop){skipPop--;if(dlg3d.open&&!skipPop)history.pushState({m3d:1},'');return}if(dlg3d.open)close3d()});
 
 // ================================================================ LOG
-const logDlg=$('#logDlg');
-function openLogSheet(rn,fn){
+const logDlg=$('#logDlg');let editId=null; // editId: the log entry being edited, or null for a new catch
+function openLogSheet(rn,fn,edit){
+  editId=edit?String(edit.id):null;if(edit){rn=edit.r;fn=edit.f}
   rn=rn||store.get('logReserve',R||RESERVES[0]);
   $('#lgReserve').innerHTML=opts(RESERVES,rn);fillLogFish(fn);
-  $('#lgWeight').value='';$('#lgScore').value='';$('#lgWUnit').value=store.get('logWUnit',unit==='metric'?'kg':'lb');$('#lgDate').value=today();$('#lgNote').value='';$('#lgRank').value='';
+  const u=store.get('logWUnit',unit==='metric'?'kg':'lb');$('#lgWUnit').value=u;
+  $('#lgWeight').value=edit&&edit.w!=null?inUnit(edit.w,wUnit()):'';$('#lgScore').value=edit&&edit.s!=null?edit.s:'';
+  $('#lgDate').value=edit&&edit.d||today();$('#lgNote').value=edit&&edit.n||'';$('#lgRank').value=edit&&edit.w==null&&edit.rank||'';
+  $('#logTitle').textContent=edit?'Edit catch':'Log a catch';$('#lgSave').textContent=edit?'Save changes':'Save catch';
   updateLogRank();logDlg.showModal();setTimeout(()=>$('#lgWeight').focus(),60);
 }
 function fillLogFish(fn){const rn=$('#lgReserve').value,fish=DATA.reserves[rn].fish;$('#lgFish').innerHTML=opts(fish,fn&&fish.includes(fn)?fn:fish[0]);updateLogRank()}
@@ -373,8 +388,10 @@ $('#logForm').addEventListener('submit',e=>{
   updateLogRank();const werr=weightError(),sc=scoreValue();
   if(werr||sc.err){haptic([30,40,30]);(werr?$('#lgWeight'):$('#lgScore')).focus();return}
   const rn=$('#lgReserve').value,fn=$('#lgFish').value,kg=logWeightKg(),rank=rankFor(rn,fn,kg)||$('#lgRank').value||null;
-  const log=getLog(),prev=bestFor(rn,fn,log),entry={id:Date.now().toString(36),r:rn,f:fn,w:kg==null?null:+kg.toFixed(3),rank,s:sc.v,d:$('#lgDate').value||today(),n:$('#lgNote').value.trim()};
-  log.push(entry);saveLog(log);store.set('logReserve',rn);logDlg.close();
+  const all=getLog(),i=editId==null?-1:all.findIndex(x=>String(x.id)===editId),log=i<0?all:all.filter((_,j)=>j!==i);
+  const prev=bestFor(rn,fn,log),entry={id:i<0?Date.now().toString(36):all[i].id,r:rn,f:fn,w:kg==null?null:+kg.toFixed(3),rank,s:sc.v,d:$('#lgDate').value||today(),n:$('#lgNote').value.trim()};
+  if(i<0)all.push(entry);else all[i]=entry;saveLog(all);store.set('logReserve',rn);logDlg.close();
+  if(i>=0){toast(`Updated ${fn}${rank?' · '+RANK_ICON[rank]+' '+rank:''}`);editId=null;if(lastFish&&!fv.hidden)fishDyn(lastFish);if(!rv.hidden)renderGrid();if(screen==='log')buildLog();return}
   const pb=kg!=null&&(!prev||prev.w==null||kg>prev.w)&&prev;
   haptic(rank==='Diamond'?[20,40,20]:15);
   toast(`Logged ${fn}${rank?' · '+RANK_ICON[rank]+' '+rank:''}${pb?' · New personal best!':''}`);
@@ -385,16 +402,17 @@ function buildLog(){
   const log=getLog(),legends=legendsCaught(),species=new Map();
   for(const rn of RESERVES)for(const f of DATA.reserves[rn].fish){const b=bestFor(rn,f,log);if(b)species.set(rn+'::'+f,b)}
   const total=RESERVES.reduce((a,rn)=>a+DATA.reserves[rn].fish.length,0),dia=[...species.values()].filter(b=>b.rank==='Diamond').length;
-  const lr=store.get('logFilterReserve',''),lf=store.get('logFilter','all');
+  // The collection opens on one reserve (the last one browsed) until "All" is picked, so the page stays short.
+  const lrs=store.get('logFilterReserve',null),lr=lrs==='all'?'':DATA.reserves[lrs]?lrs:(DATA.reserves[store.get('reserve','')]?store.get('reserve',''):RESERVES[0]),lf=store.get('logFilter','all');
   const recent=log.slice().sort((a,b)=>(b.d||'').localeCompare(a.d||'')||String(b.id).localeCompare(String(a.id))).slice(0,30);
   const tile=(n,of,label,icon)=>`<div class="statTile"><span>${icon}</span><strong>${n}${of?`<small>/${of}</small>`:''}</strong><em>${label}</em></div>`;
   lv.innerHTML=`<div class="hero"><div class="eyebrow">Saved on this device</div><h1>My log</h1>
     <div class="statTiles">${tile(species.size,total,'Fish caught','🐟')}${tile(dia,total,'Diamonds','💎')}${tile(legends.size,LEGENDS_TOTAL,'Legendaries','👑')}${tile(log.length,0,'Catches logged','📒')}</div>
     <div class="homeActions"><button class="primaryAction" id="lgNew">＋ Log a catch</button><button class="secondaryAction" id="lgBackup">Back up my log</button></div></div>
   <div class="section"><h2>Recent catches</h2>${recent.length?`<div class="logList">${recent.map(e=>{const d=DATA.reserves[e.r]?.records[e.f];if(!d)return'';
-      return `<div class="logRow"><button class="logOpen" data-lo="${esc(e.r+'::'+e.f)}"><img src="${d.image}" alt="" loading="lazy" onerror="imgFail(this)"><span><strong>${esc(e.f)}</strong><small>${esc(e.r)}${e.d?' · '+esc(e.d):''}</small>${e.n?`<small class="muted">${esc(e.n)}</small>`:''}</span></button><span class="logMeta">${e.w!=null?`<b>${kgfmt(e.w)}</b>`:''}${rankBadge(e.rank)}${e.s!=null?`<span class="logScore">⭐ ${e.s.toLocaleString()} pts</span>`:''}</span><span class="logBtns"><button class="iconBtn" data-share="${esc(e.id)}" aria-label="Share this catch">⤴</button><button class="iconBtn" data-del="${esc(e.id)}" aria-label="Delete this catch">✕</button></span></div>`}).join('')}</div>`:'<div class="mutedBox">Nothing logged yet. Tap “Log a catch” after you land a fish, or use the button on any fish page.</div>'}</div>
+      return `<div class="logRow"><button class="logOpen" data-lo="${esc(e.r+'::'+e.f)}"><img src="${d.image}" alt="" loading="lazy" onerror="imgFail(this)"><span><strong>${esc(e.f)}</strong><small>${esc(e.r)}${e.d?' · '+esc(e.d):''}</small>${e.n?`<small class="muted">${esc(e.n)}</small>`:''}</span></button><span class="logMeta">${e.w!=null?`<b>${kgfmt(e.w)}</b>`:''}${rankBadge(e.rank)}${e.s!=null?`<span class="logScore">⭐ ${e.s.toLocaleString()} pts</span>`:''}</span><span class="logBtns"><button class="iconBtn" data-edit="${esc(e.id)}" aria-label="Edit this catch">✎</button><button class="iconBtn" data-share="${esc(e.id)}" aria-label="Share this catch">⤴</button><button class="iconBtn" data-del="${esc(e.id)}" aria-label="Delete this catch">✕</button></span></div>`}).join('')}</div>`:'<div class="mutedBox">Nothing logged yet. Tap “Log a catch” after you land a fish, or use the button on any fish page.</div>'}</div>
   <div class="section"><h2>Collection</h2><p class="note">Your best rank for every fish. Tap one to open its guide.</p>
-    <div class="chipRow" id="lgReserveChips"><button class="chip${lr?'':' active'}" data-lr="">All</button>${RESERVES.map(n=>`<button class="chip${lr===n?' active':''}" data-lr="${esc(n)}">${esc(n.replace(/ (Reserve|Nature Reserve|National Park|Municipio)$/,''))}</button>`).join('')}</div>
+    <div class="chipRow" id="lgReserveChips"><button class="chip${lr?'':' active'}" data-lr="all">All</button>${RESERVES.map(n=>`<button class="chip${lr===n?' active':''}" data-lr="${esc(n)}">${esc(n.replace(/ (Reserve|Nature Reserve|National Park|Municipio)$/,''))}</button>`).join('')}</div>
     <div class="chipRow">${[['all','All'],['caught','Caught'],['missing','Not caught'],['diamond','💎 Diamond'],['nodiamond','No Diamond yet']].map(([k,l])=>`<button class="chip small${lf===k?' active':''}" data-lf="${k}">${l}</button>`).join('')}</div>
     <div class="collGrid">${(lr?[lr]:RESERVES).flatMap(rn=>DATA.reserves[rn].fish.map(f=>[rn,f])).filter(([rn,f])=>{const b=species.get(rn+'::'+f);return lf==='all'||(lf==='caught'&&b)||(lf==='missing'&&!b)||(lf==='diamond'&&b&&b.rank==='Diamond')||(lf==='nodiamond'&&(!b||b.rank!=='Diamond'))}).map(([rn,f])=>{const b=species.get(rn+'::'+f),d=DATA.reserves[rn].records[f];
       return `<button class="collItem${b?' got':''}" data-lo="${esc(rn+'::'+f)}"><img src="${d.image}" alt="" loading="lazy" onerror="imgFail(this)"><strong>${esc(f)}</strong><small>${lr?'':esc(rn.split(' ')[0])+' · '}${b?(b.rank?RANK_ICON[b.rank]+' '+b.rank:'Caught')+(b.w!=null?' · '+kgfmt(b.w):''):'Not caught'}</small></button>`}).join('')||'<div class="mutedBox">Nothing here with this filter.</div>'}</div></div>
@@ -410,6 +428,7 @@ lv.onclick=e=>{
   const lf=t.closest('[data-lf]');if(lf){store.set('logFilter',lf.dataset.lf);return buildLog()}
   const lg=t.closest('[data-legend]');if(lg)return nav('/guides/legendary/'+encodeURIComponent(lg.dataset.legend));
   const del=t.closest('[data-del]');if(del&&confirm('Delete this catch from your log?')){saveLog(getLog().filter(x=>String(x.id)!==del.dataset.del));haptic();return buildLog()}
+  const ed=t.closest('[data-edit]');if(ed){const e2=getLog().find(x=>String(x.id)===ed.dataset.edit);if(e2)openLogSheet(null,null,e2);return}
   const sh=t.closest('[data-share]');if(sh){const e2=getLog().find(x=>String(x.id)===sh.dataset.share);if(e2)shareCatch(e2)}
 };
 
@@ -426,7 +445,7 @@ async function shareCatch(e){
   if(e.rank){g.fillStyle={Diamond:'#8fe3ff',Gold:'#e5c96e',Silver:'#d5dde3',Bronze:'#d39a62',Juvenile:'#9bb0ad'}[e.rank]||'#fff';g.font='800 96px system-ui,sans-serif';g.fillText((RANK_ICON[e.rank]||'')+' '+e.rank,60,1040)}
   if(e.w!=null){g.fillStyle='#edf7f3';g.font='800 120px system-ui,sans-serif';g.fillText(kgfmt(e.w),60,e.rank?1180:1060)}
   if(e.s!=null){g.fillStyle='#e5c96e';g.font='700 52px system-ui,sans-serif';g.textAlign='right';g.fillText('⭐ '+e.s.toLocaleString()+' pts',W-60,e.w!=null?(e.rank?1180:1060):(e.rank?1180:1040));g.textAlign='left'}
-  g.fillStyle='#5d7472';g.font='500 30px system-ui,sans-serif';g.fillText('Call of the Wild: The Angler · Vanderholst Studios',60,H-60);
+  g.fillStyle='#5d7472';g.font='500 30px system-ui,sans-serif';g.fillText('Angler Guide by Vanderholst Studios · fan-made for Call of the Wild: The Angler',60,H-60,W-120);
   const blob=await new Promise(res=>c.toBlob(res,'image/png'));if(!blob)return toast('Could not make the picture.');
   const file=new File([blob],(e.f+'-'+(e.d||'catch')).replace(/[^\w-]+/g,'-')+'.png',{type:'image/png'});
   try{if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:'My '+e.f});return}}catch(err){if(err.name==='AbortError')return}
@@ -440,6 +459,12 @@ function exportBackup(){
   const blob=new Blob([JSON.stringify({app:'angler-guide',version:1,exported:new Date().toISOString(),data},null,1)],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='angler-guide-backup-'+today()+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
   toast('Backup saved. Keep the file somewhere safe.');
+}
+// Start over: removes the log, legendaries, missions, collectibles and settings saved on this device.
+function clearData(){
+  if(!confirm('Delete your log, legendaries, missions, collectibles and settings from this device? This can\'t be undone. Save a backup first if you might want them back.'))return;
+  try{Object.keys(localStorage).filter(k=>k.startsWith('ag2.')).forEach(k=>localStorage.removeItem(k))}catch(e){}
+  toast('Your data was cleared.');setTimeout(()=>location.reload(),700);
 }
 $('#importFile').addEventListener('change',async e=>{
   const f=e.target.files[0];e.target.value='';if(!f)return;
@@ -473,7 +498,7 @@ async function buildGuide(sub){
   gv.innerHTML=guideTitle('Guides','Loading…');
   try{
     if(sub==='legendary'){const L=await guide('legendary');if(screen!=='guide')return;const got=legendsCaught();
-      gv.innerHTML=guideTitle('Guides','Legendary fish',`${got.size} of ${L.length} caught. Legendaries are active in rotating weeks, each with several possible spawn spots.`)
+      gv.innerHTML=guideTitle('Guides','Legendary fish',`${got.size} of ${L.length} caught. Legendaries are active in rotating weeks, each with several possible spawn spots.`)+`<p class="note">The wiki also lists Rubbert Ducky Junior (2 kg, Golden Ridge Reserve). It isn't included here or counted in the totals.</p>`
         +RESERVES.map(rn=>{const here=L.filter(l=>l.reserves.includes(rn));return here.length?`<div class="section"><h2>${esc(rn)}</h2><div class="legendGrid">${here.map(l=>legendCard(l,got)).join('')}</div></div>`:''}).join('');
       document.title='Legendary fish · Angler Guide';
     }else if(sub==='missions'||sub==='collectibles')await buildChecklist(sub);
@@ -500,7 +525,7 @@ async function buildLegend(name){
   document.title=l.name+' · Angler Guide';
   gv.innerHTML=`<div class="hero"><div class="eyebrow">${esc(l.reserves.join(', '))} · Legendary fish</div><h1>👑 ${esc(l.name)}</h1>
     <div class="stats">${l.species?`<div class="pill">🐟 ${esc(l.species)}</div>`:''}<div class="pill">⚖️ ${kgfmt(l.weight)}</div>${l.time?`<div class="pill">🕐 ${esc(l.time)}</div>`:''}</div>
-    <div class="fishTools"><button class="toolAction${got?'':' primary'}" id="legendToggle" data-name="${esc(l.name)}">${got?'✓ Caught':'＋ Mark as caught'}</button>${fishHere?`<button class="toolAction" data-fishlink="${esc(rn+'::'+fishHere)}">${esc(fishHere)} guide →</button>`:''}</div></div>
+    <div class="fishTools"><button class="toolAction${got?'':' primary'}" id="legendToggle" data-name="${esc(l.name)}">${got?'✓ Caught':'＋ Mark as caught'}</button>${l.map?'<button class="toolAction" data-goto-where>📍 Spawn spots ↓</button>':''}${fishHere?`<button class="toolAction" data-fishlink="${esc(rn+'::'+fishHere)}">${esc(fishHere)} guide →</button>`:''}</div></div>
   <div class="card section catchGuide" id="catchGuide"><h2>How to catch ${esc(l.name)}</h2><div class="mutedBox">Loading…</div></div>
   <div class="detailgrid section"><div>
     <div class="card"><div class="imageWrap"><img class="heroimg" src="${l.image||''}" alt="${esc(l.name)}" onerror="imgFail(this)"></div>
@@ -511,11 +536,12 @@ async function buildLegend(name){
       :`<div class="note">Known spawn spots are marked in green. Each week it's active, it appears at one of them.</div>`}`:'<div class="mutedBox">No location map is published for this legendary.</div>'}</div>
   </div><div>
     <div class="card"><h2>The legend</h2>${l.story.map(p=>`<p class="story">${esc(p)}</p>`).join('')}</div>
-    <div class="card" style="margin-top:18px"><h2>Bait &amp; lure preferences</h2>${tiers.map(p=>`<div class="tier">${p}%</div>`+l.baits.filter(b=>b[1]===p).map(b=>`<span class="tag${b[0]===l.preferred?' pref':''}">${b[0]===l.preferred?'★ ':''}${esc(b[0])}</span>`).join('')).join('')||'<div class="mutedBox">Not listed.</div>'}</div>
+    <div class="card" style="margin-top:18px"><h2>Bait &amp; lure preferences</h2>${tiers.map(p=>`<div class="tier">${p}%</div>`+l.baits.filter(b=>b[1]===p).map(b=>`<span class="tag${isPref(b[0],l.preferred)?' pref':''}">${isPref(b[0],l.preferred)?'★ ':''}${esc(b[0])}</span>`).join('')).join('')||'<div class="mutedBox">Not listed.</div>'}</div>
     <div class="card" style="margin-top:18px"><h2>Traits</h2>${l.traits.length?`<ul class="traitList">${l.traits.map(t=>`<li><strong>${esc(t.name)}</strong><span>${esc(t.desc)}</span></li>`).join('')}</ul>`:'<div class="mutedBox">Not listed.</div>'}</div>
   </div></div><div class="source">Source: <a href="${l.source}" target="_blank" rel="noopener">The Angler Wiki</a> (community-maintained; may contain errors).</div>`;
+  let lmap=null;
   if(l.map){
-    const m=mkMap($('#lmap'),l.map),sp=l.spots||[];
+    const m=lmap=mkMap($('#lmap'),l.map),sp=l.spots||[];
     if(sp.length){m.pins(sp);requestAnimationFrame(()=>m.fit(sp));
       $('#where').onclick=e=>{const b=e.target.closest('[data-spotgo]');if(!b)return;const v=b.dataset.spotgo;
         $('#where').querySelectorAll('[data-spotgo]').forEach(x=>x.classList.toggle('active',x===b));
@@ -524,7 +550,8 @@ async function buildLegend(name){
   catchGuide(l,L);
   if(jumpToSpots){jumpToSpots=false;setTimeout(()=>$('#where')?.scrollIntoView({block:'start'}),60)}
   const a=(await activeLegends())[rn];
-  if(a&&a.legendary===l.name&&screen==='legend'&&run===legendBuild){const st=$('.hero .stats',gv);if(st)st.insertAdjacentHTML('afterbegin',`<div class="pill twPill">📍 Active this week${spotKnown(a.spot)?': '+esc(a.spot):', spot not confirmed'}</div>`)}
+  if(a&&a.legendary===l.name&&screen==='legend'&&run===legendBuild){const st=$('.hero .stats',gv),sl=spotLabel(a,l),pin=spotPin(a,l);if(st)st.insertAdjacentHTML('afterbegin',`<div class="pill twPill">📍 Active this week${sl?': '+esc(sl):', spot not confirmed'}</div>`)
+    if(pin&&lmap){lmap.pick(pin-1);$('#where [data-spotgo="'+(pin-1)+'"]')?.classList.add('active','thisWeekSpot');requestAnimationFrame(()=>lmap.focus(l.spots[pin-1][0],l.spots[pin-1][1],2.5))}}
 }
 
 // ------------------------------------------------------------ legendary catching guide
@@ -589,7 +616,7 @@ async function catchGuide(l,L){
       <div class="row"><small>Hooks</small><strong>${esc(l.hooks.join(', ')||'Not listed')}</strong></div></div>
       ${over?`<p class="note">No ${rig[0].toLowerCase()} rig setup is rated for its full weight, so use the strongest line your rod takes and play it carefully: keep the drag below the line rating and let it tire itself out. Landing a fish heavier than the line multiplies your score.</p>`:''}</li>`;
   }
-  const where=act&&act.legendary===l.name?`It's <strong>active this week</strong>${spotKnown(act.spot)?` at <strong>${esc(act.spot)}</strong>.`:`. Its spot for this week isn't confirmed yet, so try its known spots on the map below.`}`
+  const where=act&&act.legendary===l.name?`It's <strong>active this week</strong>${spotLabel(act,l)?` at <strong>${esc(spotLabel(act,l))}</strong>.`:`. Its spot for this week isn't confirmed yet, so try its known spots on the map below.`}`
     :act&&act.legendary?`This week's ${esc(l.reserves[0])} legendary is ${esc(act.legendary)}, so ${esc(l.name)} isn't active until a later week.`:`This week's legendary in ${esc(l.reserves[0])} isn't confirmed yet. Check the Home screen.`;
   const others=L.filter(x=>x.reserves[0]===l.reserves[0]&&x.name!==l.name).map(x=>x.name);
   box.innerHTML=`<h2>How to catch ${esc(l.name)}</h2><ol class="cgSteps">
@@ -598,7 +625,7 @@ async function catchGuide(l,L){
     <li><strong>Pick your time.</strong> ${esc(when)}.${trait('Night Owl')?' It\'s most active at night.':''}${trait('Sun Lover')?' It\'s most active after sunrise.':''}</li>
     <li><strong>Fish the right depth.</strong> It spawns ${dMin!=null?`between ${sd(dMin+' m')} and ${sd((dMax??dMin)+' m')}`:'at an unknown depth'}. ${trait('Bottom Lurker')||deep?'Get your bait down near the bottom.':'Set your float or let your lure sink into that range.'}</li>
     <li><strong>Use its favourite ${naturals.length&&lures.length?'baits and lures':lures.length?'lures':'baits'}.</strong> ${top.length?`These have the best bite chance (${top[0][1]}%):`:'No bait preferences are listed.'}
-      ${naturals.length?`<div class="cgBaits"><small>Bait</small> ${naturals.map(b=>`<span class="tag${b[0]===l.preferred?' pref':''}">${b[0]===l.preferred?'★ ':''}${esc(b[0])}</span>`).join('')}</div>`:''}
+      ${naturals.length?`<div class="cgBaits"><small>Bait</small> ${naturals.map(b=>`<span class="tag${isPref(b[0],l.preferred)?' pref':''}">${isPref(b[0],l.preferred)?'★ ':''}${esc(b[0])}</span>`).join('')}</div>`:''}
       ${lureText.length?`<div class="cgBaits"><small>Lures (retrieve)</small> ${lureText.map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>`:''}</li>
     <li><strong>Rig up.</strong> ${rigs.length>1?`Use a <strong>${rigs[0][0]} rig</strong> for ${rigs[0][1]} or a <strong>${rigs[1][0]} rig</strong> for ${rigs[1][1]}. The gear below is for the ${rigs[0][0].toLowerCase()} rig.`:`Use a <strong>${rig[0]} rig</strong>.`}</li>
     ${tackle}
@@ -664,7 +691,7 @@ function gearHelper(G){
   const safe=lines.find(x=>x.test>=maxW)||lines[lines.length-1],bold=[...lines].reverse().find(x=>x.test<maxW*.8&&x.test>=maxW*.5);
   const rods=G.Rods.items.filter(x=>num(x.stats['Max Line Strength'])>=(safe?safe.test:0)).sort((a,b)=>(num(a.stats.Level)||0)-(num(b.stats.Level)||0));
   const reels=G.Reels.items.filter(x=>num(x.stats['Max Drag'])>=maxW*.5).sort((a,b)=>(num(a.stats.Level)||0)-(num(b.stats.Level)||0));
-  const lineName=x=>`<strong>${esc(x.name)}</strong> <span class="muted">(${esc(x.stats.Type)}, ${kgfmt(x.test)})</span>`;
+  const lineName=x=>`<strong>${esc(x.name)}</strong>${unit==='metric'?'':` <span class="muted">(rated ${kgfmt(x.test)})</span>`}`;
   $('#gearBody').innerHTML=`<div class="card gearHelper"><div class="toolFields bitingFields">
       <label>Reserve<select id="ghReserve" class="select">${opts(RESERVES,rn)}</select></label>
       <label>Fish<select id="ghFish" class="select">${opts(fish,fn)}</select></label>
@@ -705,6 +732,8 @@ function setScreen(name){
   screen=name;
   $$('[data-tab]').forEach(b=>{const on=b.dataset.tab===TAB_OF[name];b.classList.toggle('active',on);on?b.setAttribute('aria-current','page'):b.removeAttribute('aria-current')});
   back.hidden=!DEPTH[name]||name==='reserve';sel.hidden=!(name==='reserve'||name==='fish');
+  $('.top').classList.toggle('compact',!back.hidden||!sel.hidden); // phones: show the app name when the bar has room
+  $('#reservesBtn').classList.toggle('active',TAB_OF[name]==='reserve');$('#logBtn').classList.toggle('active',TAB_OF[name]==='log');$('#guidesBtn').classList.toggle('active',TAB_OF[name]==='guides');$('#homeBtn').classList.toggle('active',name==='home');
 }
 const showOnly=el=>{for(const s of [home,rv,fv,lv,gv])s.hidden=s!==el};
 function route(){
@@ -749,11 +778,11 @@ function applyTheme(){document.documentElement.dataset.theme=theme;
 matchMedia('(prefers-color-scheme: light)').addEventListener('change',()=>{if(theme==='auto')applyTheme()});
 applyTheme();
 const openSettings=()=>{if(!$('#set').open)$('#set').showModal()};
-$('#gear').onclick=openSettings;$('#logBtn').onclick=()=>nav('/log');$('#guidesBtn').onclick=()=>nav('/guides');$('#close').onclick=()=>$('#set').close();
+$('#gear').onclick=openSettings;$('#logBtn').onclick=()=>nav('/log');$('#reservesBtn').onclick=()=>{const rn=R||store.get('reserve','');go(DATA.reserves[rn]?rn:RESERVES[0])};$('#guidesBtn').onclick=()=>nav('/guides');$('#close').onclick=()=>$('#set').close();
 $('#set').onclick=e=>{const u=e.target.closest('[data-u]'),t=e.target.closest('[data-t]'),th=e.target.closest('[data-theme-pick]');
   if(e.target.id==='set')e.target.close();
   if(u){unit=u.dataset.u;store.set('unit',unit)}if(t){tu=t.dataset.t;store.set('temp',tu)}if(th){theme=th.dataset.themePick;store.set('theme',theme);applyTheme()}
-  if(e.target.closest('#exportBtn'))exportBackup();if(e.target.closest('#importBtn'))$('#importFile').click();
+  if(e.target.closest('#exportBtn'))exportBackup();if(e.target.closest('#clearBtn'))clearData();if(e.target.closest('#importBtn'))$('#importFile').click();
   if(u||t||th)refresh()};
 addEventListener('hashchange',route);route();refresh();
 $('#appVersion').textContent=APP_VERSION;
