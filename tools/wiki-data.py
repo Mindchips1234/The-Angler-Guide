@@ -1,6 +1,6 @@
 """Collect guide data from The Angler Wiki (theangler.org) into data/*.json.
 
-Usage:  python3 tools/wiki-data.py [cache-dir]
+Usage:  python3 tools/wiki-data.py [cache-dir] [file ...]   (e.g. .wiki-cache fish-refresh)
 
 Writes:
   data/legendary.json    16 legendary fish: story, facts, baits, traits, location map
@@ -74,6 +74,14 @@ def specs(root):
         for alt in v.select('.taw-alt'): alt.decompose()
         out[txt(k)] = txt(v)
     return out
+
+
+def num(s):
+    """'300.0m' -> 300 (int when whole), None if no number."""
+    m = re.search(r'[\d.]+', s or '')
+    if not m: return None
+    v = float(m.group(0))
+    return int(v) if v.is_integer() else v
 
 
 def kg(s):
@@ -198,6 +206,8 @@ def gear():
 
 
 # ---------------------------------------------------------------------- fish refresh
+HABITATS = {'Shallow Pond', 'Deep Pond', 'Lake Shore', 'Shallow Lake', 'Deep Lake', 'Upstream', 'Middle Stream',
+            'Low Stream', 'Upriver', 'Middle River', 'River Mouth', 'Pond Wetland', 'River Wetland'}
 def fish_refresh(sources):
     def one(url):
         s = soup(url); body = s.select_one('.entry-content')
@@ -212,12 +222,22 @@ def fish_refresh(sources):
             ranks.append({'rank': rank, 'min': kg(w[0]) if w else None, 'max': kg(w[-1]) if w else None, 'hooks': hooks})
         fig = body.select('figure a[href$=".webp"]')
         hot = [a['href'] for a in fig if 'hotspot' in a['href']]
-        hab = re.search(r'can be found in (.+?)\.', txt(body))
+        # "Burbot can be found in Shallow Lake, ... and River Mouth." The in-game description can also say
+        # "can be found in large rivers", so only a list made entirely of the game's habitat names counts.
+        hab = None
+        for p in body.find_all('p'):
+            m = re.search(r'can be found in (.+?)\.$', txt(p))
+            if m and all(h.strip() in HABITATS for h in re.split(r',|\band\b', m.group(1)) if h.strip()): hab = m
+        pref = re.search(r'preferes (.+?) as bait', txt(body))
+        depth = re.findall(r'[\d.]+', sp.get('Spawn Depth Range', ''))[:2]
         return url, {
             'ranks': ranks, 'baits': baits(body), 'traits': [t['name'] for t in traits(body)],
             'temp': sp.get('Water Temp Range'), 'ideal': sp.get('Ideal Water Temp'),
-            'time': re.sub(r'^[^A-Za-z]+', '', sp.get('Time of Day', '')),
+            'time': ' + '.join(re.findall(r'Daytime|Nighttime', sp.get('Time of Day', ''))),
             'habitats': [h.strip() for h in re.split(r',|\band\b', hab.group(1)) if h.strip()] if hab else None,
+            'preferred': pref.group(1).strip() if pref else None,  # blank on the wiki for a few fish
+            'spawnDepth': ' – '.join(f'{float(v):.1f}' for v in depth) + ' m' if len(depth) == 2 else None,
+            'maxDepth': num(sp.get('Max Water Depth')),
             'hotspotMap': hot[0] if hot else None,
         }
     return dict(pmap(one, sources))
@@ -230,7 +250,9 @@ if __name__ == '__main__':
     sources = sorted({r['source'] for res in DATA['reserves'].values() for r in res['records'].values()})
     jobs = [('legendary', legendary), ('missions', missions), ('collectibles', collectibles), ('gear', gear),
             ('fish-refresh', lambda: fish_refresh(sources))]
+    only = sys.argv[2:]  # e.g. "fish-refresh" to rebuild just that file
     for name, fn in jobs:
+        if only and name not in only: continue
         data = fn()
         json.dump(data, open(os.path.join(OUT, name + '.json'), 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
         print(name, 'ok', len(data))

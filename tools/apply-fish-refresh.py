@@ -2,7 +2,9 @@
 
 Usage:  python3 tools/apply-fish-refresh.py
 
-Updates each fish's rank table (weight range and hook sizes per rank) and its traits.
+Updates each fish's rank table (weight range and hook sizes per rank), traits, bait list,
+preferred bait, time of day, habitats, spawn depth and max water depth.
+A fish with no preferred bait on the wiki gets none (the app shows "Not listed").
 Everything else in the fish data is left as it is.
 """
 import json, os
@@ -18,12 +20,18 @@ for res in data['reserves'].values():
     for rec in res['records'].values():
         f = fresh.get(rec['source'])
         if not f: continue
-        before = json.dumps([rec.get('hookRanks'), rec.get('ranks'), rec.get('traits')])
+        FIELDS = ['hookRanks', 'ranks', 'traits', 'baits', 'preferred', 'time', 'habitats', 'spawnDepth', 'maxDepth']
+        before = json.dumps([rec.get(k) for k in FIELDS])
         if f['ranks']:
             rec['ranks'] = [{'rank': r['rank'], 'min': r['min'], 'max': r['max'], 'hooks': r['hooks']} for r in f['ranks']]
             rec['hookRanks'] = [{'rank': r['rank'], 'hooks': r['hooks']} for r in f['ranks'] if r['hooks']]
         if f['traits']: rec['traits'] = f['traits']
-        changed += before != json.dumps([rec.get('hookRanks'), rec.get('ranks'), rec.get('traits')])
+        if f['baits']: rec['baits'] = f['baits']
+        rec['preferred'] = f.get('preferred')
+        for k in ('time', 'habitats', 'spawnDepth'):
+            if f.get(k): rec[k] = f[k]
+        if f.get('maxDepth') is not None: rec['maxDepth'] = f['maxDepth']
+        changed += before != json.dumps([rec.get(k) for k in FIELDS])
 lines[i] = 'const DATA=' + json.dumps(data, ensure_ascii=False, separators=(',', ':')) + line[cut:]
 open(path, 'w', encoding='utf-8').write('\n'.join(lines))
 print('updated', changed, 'fish')
