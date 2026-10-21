@@ -179,8 +179,10 @@ def collectibles():
         for sec in s.select('section.taw-group'):
             h2 = sec.find('h2')
             for sub in h2.select('.taw-chip-sub'): sub.decompose()
+            links = sec.select('ul.taw-cols li a')
             groups.append({'type': txt(h2), 'about': txt(sec.find('p')),
-                           'items': [clean(txt(a)) for a in sec.select('ul.taw-cols li a')]})
+                           'items': [clean(txt(a)) for a in links],
+                           'links': [a['href'].rstrip('/').rsplit('/', 1)[-1] for a in links]})  # wiki page slug per item
         out[name] = groups
     return out
 
