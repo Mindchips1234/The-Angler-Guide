@@ -6,7 +6,8 @@ Writes:
   data/legendary.json    16 legendary fish: story, facts, baits, traits, location map
   data/missions.json     every mission per reserve, grouped by type, with objectives and rewards
   data/collectibles.json every collectible per reserve, grouped by type
-  data/gear.json         rods, reels, lines and hooks with their stats
+  data/gear.json         rods, reels, lines, hooks and lures with their stats; lures also get
+                         the reel speed range the wiki lists for each retrieve ('lures' rebuilds just those)
   data/fish-refresh.json latest facts for each fish page the app links to, including
                          the weight range of every rank (merged into data/fish-data.js by
                          tools/apply-fish-refresh.py)
@@ -204,7 +205,33 @@ def gear():
             about = body.find('p') if body else None
             return {'name': txt(s.select_one('h1.page-title')), 'about': clean(txt(about)), 'stats': sp}
         out[label] = {'intro': intro, 'items': pmap(one, urls)}
+    out['Lures'] = lures()
     return out
+
+
+RETRIEVE = {'StopAndGo': 'Stop and Go'}
+GAME_MAX_SPEED = 6  # the wiki says "1 to 5", but the game's reel speed setting goes up to 6x (checked in game by Jude, 2026-10-24)
+def lures():
+    """Lures and soft plastics from the Baits and Lures page. The wiki states the reel speed a lure works at per
+    retrieve ("Works on Constant at reel speed 1 to 5, ..."); soft plastics have no such line, so speeds stays empty."""
+    idx = soup(f'{BASE}/equipment/baits-and-lures')
+    urls = sorted({a['href'].rstrip('/') for a in idx.select('a[href*="/baits-and-lures/"]')
+                   if re.search(r'/baits-and-lures/[a-z0-9-]+/?$', a['href'])})
+    def one(url):
+        s = soup(url); body = s.select_one('.taw.entry-content') or s.select_one('.entry-content')
+        sp = specs(body)
+        if sp.get('Category') not in ('Lure', 'Soft Plastics'): return None
+        works = body.find(string=re.compile(r'Works on'))
+        speeds = [{'retrieve': RETRIEVE.get(r, r), 'min': int(a), 'max': GAME_MAX_SPEED if int(b) == 5 else int(b)}
+                  for r, a, b in re.findall(r'(\w+) at reel speed (\d+) to (\d+)', works or '')]
+        stats = {k: sp[k] for k in ('Fishing Rigs', 'Presentation', 'Techniques', 'Attraction Radius', 'Sink Rate') if sp.get(k)}
+        stats['Type'] = sp['Category']
+        if sp.get('Smallest'): stats['Hooks'] = sp['Smallest'] + (' to ' + sp['Largest'] if sp.get('Largest') not in (None, sp['Smallest']) else '')
+        about = body.find('p')
+        return {'name': txt(s.select_one('h1.page-title')), 'about': clean(txt(about)) if about and 'taw-eyebrow' not in (about.get('class') or []) else '',
+                'stats': stats, 'speeds': speeds, 'source': url}
+    intro = ['The reel speed is the 1x to 6x retrieve setting you change while reeling in. Every lure works at 1x to 6x on every retrieve it supports (the wiki says 1 to 5, but the game goes up to 6x). No different speed is given for each fish, and no speed is listed for soft plastics fished on a jig head.']
+    return {'intro': intro, 'items': [x for x in pmap(one, urls) if x]}
 
 
 # ---------------------------------------------------------------------- fish refresh
@@ -253,8 +280,12 @@ if __name__ == '__main__':
     jobs = [('legendary', legendary), ('missions', missions), ('collectibles', collectibles), ('gear', gear),
             ('fish-refresh', lambda: fish_refresh(sources))]
     only = sys.argv[2:]  # e.g. "fish-refresh" to rebuild just that file
+    jobs.append(('lures', None))  # just the lures, merged into gear.json without re-reading every rod and reel
     for name, fn in jobs:
-        if only and name not in only: continue
-        data = fn()
+        if only and name not in only or not only and fn is None: continue
+        if fn is None:
+            path = os.path.join(OUT, 'gear.json'); data = json.load(open(path, encoding='utf-8'))
+            data['Lures'] = lures(); name = 'gear'
+        else: data = fn()
         json.dump(data, open(os.path.join(OUT, name + '.json'), 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
         print(name, 'ok', len(data))
