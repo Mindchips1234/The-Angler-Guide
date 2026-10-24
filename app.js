@@ -26,10 +26,10 @@ const wrange=d=>{const rs=d.ranks||[];return rs.length&&rs[0].min!=null&&rs[rs.l
 const isPref=(b,pref)=>!!pref&&(b===pref||b.startsWith(pref+' - '));
 const prefText=d=>d.preferred||'Not listed';
 // Reel speed (the game's 1x–6x retrieve setting) a lure works at on a retrieve, from the wiki's lure pages (gear.json Lures).
-// The wiki gives one range per lure and retrieve, the same for every fish; null when it lists none (soft plastics).
+// One range per lure and retrieve, the same for every fish; null when the wiki lists none (soft plastics).
 const isLureBait=b=>/ - (Constant|Jigging|Stop and Go|Twitching)$/.test(b);
 const lureSpeed=(G,type,ret)=>{const x=G&&G.Lures&&G.Lures.items.find(i=>i.name===type),v=x&&x.speeds.find(v=>v.retrieve===ret);return v?`${v.min}x–${v.max}x`:null};
-const SPEED_NOTE='Reel speed is the 1x to 6x setting you change while reeling. The Angler Wiki lists the speeds each lure works at, and gives the same range whatever the fish, so a fish-specific speed is not confirmed. No lure is listed as working at 6x, and no speed is listed for soft plastics on a jig head.';
+const SPEED_NOTE='Reel speed is the 1x to 6x setting you change while reeling. Every lure works across the full 1x to 6x range in the game (the wiki says 1 to 5). The range is the same whatever the fish, so a fish-specific speed is not confirmed. No speed is listed for soft plastics on a jig head.';
 // Every lure and retrieve this fish takes, best bite chance first, with the reel speed it works at.
 function speedTable(G,baits){
   const rows=baits.filter(b=>isLureBait(b[0])).sort((a,b)=>b[1]-a[1]);
@@ -602,7 +602,7 @@ async function catchGuide(l,L){
   const act=(await activeLegends())[l.reserves[0]];if(!$('#catchGuide'))return;
   const trait=n=>l.traits.some(t=>t.name===n),top=l.baits.length?l.baits.filter(b=>b[1]===l.baits[0][1]):[];
   const isLure=b=>isLureBait(b[0]),lures=top.filter(isLure),naturals=top.filter(b=>!isLure(b));
-  // Lures grouped by type with their best retrieves and reel speed, e.g. "Spinnerbait (Constant 1x–5x, Twitching 1x–5x)".
+  // Lures grouped by type with their best retrieves and reel speed, e.g. "Spinnerbait (Constant 1x–6x, Twitching 1x–6x)".
   const byLure={};for(const [b] of lures){const [t,s]=b.split(' - ');(byLure[t]=byLure[t]||[]).push(s)}
   const lureText=Object.entries(byLure).map(([t,s])=>`${t} (${s.map(r=>{const v=lureSpeed(G,t,r);return G?`${r} ${v||'speed not listed'}`:r}).join(', ')})`);
   const [dMin,dMax]=(String(l.spawnDepth||'').match(/[\d.]+/g)||[]).map(Number);
