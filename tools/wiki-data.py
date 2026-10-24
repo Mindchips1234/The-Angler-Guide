@@ -230,7 +230,7 @@ def lures():
         about = body.find('p')
         return {'name': txt(s.select_one('h1.page-title')), 'about': clean(txt(about)) if about and 'taw-eyebrow' not in (about.get('class') or []) else '',
                 'stats': stats, 'speeds': speeds, 'source': url}
-    intro = ['The reel speed is the 1x to 6x retrieve setting you change while reeling in. Every lure works at 1x to 6x on every retrieve it supports (the wiki says 1 to 5, but the game goes up to 6x). No different speed is given for each fish, and no speed is listed for soft plastics fished on a jig head.']
+    intro = ['The reel speed is the 1x to 6x retrieve setting you change while reeling in. Every lure works at 1x to 6x on every retrieve it supports (the wiki says 1 to 5, but the game goes up to 6x). The wiki does not say which speed is best, and lists no speed for soft plastics on a jig head, so the speeds below are Steam player tips (unverified).']
     return {'intro': intro, 'items': [x for x in pmap(one, urls) if x]}
 
 
