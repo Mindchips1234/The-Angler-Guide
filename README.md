@@ -1,4 +1,4 @@
-# Angler Guide 3.12
+# Angler Guide 3.13
 
 Angler Guide, by Vanderholst Studios, is a fan-made, offline-ready field guide for the game *Call of the Wild: The Angler*. It is not affiliated with the game's developers. It covers all five reserves, 96 fish entries (84 species), 15 legendary fish, 313 missions, 247 collectibles and 175 pieces of gear plus 17 lures, with a 3D model of every species and a log for everything you catch.
 
@@ -22,9 +22,9 @@ Five tabs on phones (header buttons on larger screens):
 | Tab | What's in it |
 | --- | --- |
 | **Home** | **This week's legendaries** (the active legendary and its spawn spot in each reserve, with a countdown to the next rotation), search every fish, **What's biting?** (pick a reserve, time of day, water temperature and bait; it ranks the fish most likely to bite), and the reserve list |
-| **Reserves** | Interactive map with hotspot overlays, the reserve's legendary fish, and a filterable fish list. Each fish page has bait preferences, the reel speed for each lure it takes, traits, a hotspot map, a **rank table with the weight range and hook size for every rank**, the 3D model (tap the picture) and a **Log a catch** button |
+| **Reserves** | Interactive map with hotspot overlays, the reserve's legendary fish, and a filterable fish list. Each fish page has bait preferences, the reel speed range and player speed tips for each lure it takes, traits, a hotspot map, a **rank table with the weight range and hook size for every rank**, the 3D model (tap the picture) and a **Log a catch** button |
 | **Log** | Your catches with weight, rank (worked out from the weight), score and date, each editable (enter the weight in kg, g, lb or oz; a weight above the fish's maximum is flagged as invalid); fish caught, Diamonds and legendaries counters; a collection of every fish showing your best rank and personal best; share any catch as a picture |
-| **Guides** | **Legendary fish** (every known spawn spot numbered on its map, with buttons to zoom to each; a step-by-step catching plan for each one with time, depth, baits, rig, suggested line, rod and reel, and tips for its traits; plus story, location map and a caught tracker), **Missions** and **Collectibles** (tick-off lists per reserve, missions with objectives and rewards), **Gear guide** (every rod, reel, line, hook and lure, with the reel speed each lure works at for each retrieve, plus a setup helper that suggests hooks, line and rods for any fish and rank), and links to the community records hub and the wiki |
+| **Guides** | **Legendary fish** (every known spawn spot numbered on its map, with buttons to zoom to each; a step-by-step catching plan for each one with time, depth, baits, rig, suggested line, rod and reel, and tips for its traits; plus story, location map and a caught tracker), **Missions** and **Collectibles** (tick-off lists per reserve, missions with objectives and rewards), **Gear guide** (every rod, reel, line, hook and lure, with the reel speed range each lure works at and Steam players' speed tips (labelled unverified), plus a setup helper that suggests hooks, line and rods for any fish and rank), and links to the community records hub and the wiki |
 | **Settings** | Metric/imperial, °C/°F, dark/light/match-device theme, back up and restore your progress, clear your data, replay the intro |
 
 Your log, legendaries, missions and collectibles are saved on the device only. Use **Settings → Save backup** before changing phones or clearing your browser, and **Restore backup** to bring them back.

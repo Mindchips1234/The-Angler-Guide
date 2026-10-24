@@ -1,6 +1,128 @@
 {
- "_about": "Reel speed to use, from Jude's in-game testing (no credible published source has one). 'fish' maps a fish name (as in the app) to {'Lure - Retrieve': speed}; 'lures' maps a lure to {'Retrieve': speed} as the fallback for any fish without its own speed. Anything left out shows as 'best speed not confirmed'.",
- "source": "",
- "fish": {},
- "lures": {}
+ "_about": "Reel speed tips from Steam players, shown in the app as unverified player tips (Jude chose to use them, 2026-10-24; no credible source publishes a speed per lure or fish). Read from search-engine previews of the posts because steamcommunity.com is blocked from the cloud session. A tip applies to its lures, retrieves and fish; a missing key means any.",
+ "tips": [
+  {
+   "speed": 1,
+   "lures": [
+    "Spinner",
+    "Spoon"
+   ],
+   "retrieves": [
+    "Constant"
+   ],
+   "text": "Use Constant at 1x for spinners, spoons and similar lures.",
+   "source": {
+    "title": "Steam guide: Lures and baits",
+    "url": "https://steamcommunity.com/sharedfiles/filedetails/?id=2858041421"
+   }
+  },
+  {
+   "speed": 1,
+   "retrieves": [
+    "Constant"
+   ],
+   "text": "Constant is \"1x only really\"; higher speeds are for Stop and Go or Twitching.",
+   "source": {
+    "title": "Steam discussion",
+    "url": "https://steamcommunity.com/app/1408610/discussions/0/4366878398990102194"
+   }
+  },
+  {
+   "speed": 3,
+   "retrieves": [
+    "Stop and Go",
+    "Twitching"
+   ],
+   "text": "Speed 3 is for Stop and Go or Twitching, which slow the lure down, not for Constant.",
+   "source": {
+    "title": "Steam discussion",
+    "url": "https://steamcommunity.com/app/1408610/discussions/0/4366878398990102194"
+   }
+  },
+  {
+   "speed": 3,
+   "lures": [
+    "Spinner"
+   ],
+   "retrieves": [
+    "Constant"
+   ],
+   "text": "Fishes spinners at 3x, then drops to 2x or 1x when a fish chases.",
+   "source": {
+    "title": "Steam discussion: Issues with reeling speed while using Lures",
+    "url": "https://steamcommunity.com/app/1408610/discussions/0/3380536561718707642"
+   }
+  },
+  {
+   "speed": 1,
+   "retrieves": [
+    "Constant"
+   ],
+   "text": "Anything over 1x is often too fast for a fish to catch the lure, though catches at 2x happen.",
+   "source": {
+    "title": "Steam discussion: Sometimes fish can't catch up to reeling speed",
+    "url": "https://steamcommunity.com/app/1408610/discussions/0/3380536561710542997/"
+   }
+  },
+  {
+   "speed": 4,
+   "lures": [
+    "Crankbait"
+   ],
+   "fish": [
+    "Shovelnose Sturgeon"
+   ],
+   "text": "A size 3/0 crankbait at speed 4 (drag 40–45%) ran about 16 m deep and a sturgeon followed it.",
+   "source": {
+    "title": "Steam discussion: legendary.",
+    "url": "https://steamcommunity.com/app/1408610/discussions/0/3785877016598241382/?ctp=2"
+   }
+  },
+  {
+   "speed": 3,
+   "lures": [
+    "Spoon"
+   ],
+   "fish": [
+    "Atlantic Salmon",
+    "Cherry Salmon",
+    "Chum Salmon",
+    "Kokanee Salmon",
+    "Sockeye Salmon"
+   ],
+   "text": "A size 5 spoon at speed 3 near the surface caught several salmon (the post doesn't say which species).",
+   "source": {
+    "title": "Steam discussion: Larger Lure Question",
+    "url": "https://steamcommunity.com/app/1408610/discussions/0/8059829560018195987/"
+   }
+  },
+  {
+   "speed": 4,
+   "retrieves": [
+    "Constant"
+   ],
+   "fish": [
+    "Northern Pike"
+   ],
+   "text": "Caught a Northern Pike on Constant at speed 4 from the lake shore in daytime (lure not stated).",
+   "source": {
+    "title": "Steam discussion: Find the lure Quest",
+    "url": "https://steamcommunity.com/app/1408610/discussions/0/3785877016595932130/"
+   }
+  },
+  {
+   "speed": 2,
+   "retrieves": [
+    "Stop and Go"
+   ],
+   "fish": [
+    "Northern Pike"
+   ],
+   "text": "Caught a pike on Stop and Go at speed 2 (lure not stated).",
+   "source": {
+    "title": "Steam discussion: Find the lure Quest",
+    "url": "https://steamcommunity.com/app/1408610/discussions/0/3785877016595932130/"
+   }
+  }
+ ]
 }

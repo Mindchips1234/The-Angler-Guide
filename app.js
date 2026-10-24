@@ -4,7 +4,7 @@ const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelecto
 const store={get(k,d){try{return localStorage.getItem('ag2.'+k)||d}catch(e){return d}},set(k,v){try{localStorage.setItem('ag2.'+k,v)}catch(e){}}};
 const jget=(k,d)=>{try{const v=JSON.parse(store.get(k,''));return v==null?d:v}catch(e){return d}},jset=(k,v)=>store.set(k,JSON.stringify(v));
 const REGION={'Izilo Zasendulo':'Mpumalanga, South Africa','Golden Ridge Reserve':'USA (based on Wyoming)'}; // Golden Ridge has no state in the game
-const APP_VERSION='3.12',reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const APP_VERSION='3.13',reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
 let unit=store.get('unit','metric'),tu=store.get('temp','celsius'),R=null,lastFish=null,built=null,scrollRv=0,hmap=null;
 const home=$('#home'),rv=$('#rv'),fv=$('#fv'),lv=$('#lv'),gv=$('#gv'),back=$('#back'),sel=$('#rsel');
 const haptic=(ms=10)=>{try{navigator.vibrate&&navigator.vibrate(ms)}catch(e){}};
@@ -29,16 +29,23 @@ const prefText=d=>d.preferred||'Not listed';
 // One range per lure and retrieve, the same for every fish; null when the wiki lists none (soft plastics).
 const isLureBait=b=>/ - (Constant|Jigging|Stop and Go|Twitching)$/.test(b);
 const lureSpeed=(G,type,ret)=>{const x=G&&G.Lures&&G.Lures.items.find(i=>i.name===type),v=x&&x.speeds.find(v=>v.retrieve===ret);return v?`${v.min}x–${v.max}x`:null};
-// The speed to use from in-game testing (data/lure-speeds.json, loaded into G.use): the fish's own speed for that lure
-// and retrieve, else the lure's general one, else null (not confirmed).
-const lureUse=(G,type,ret,fish)=>{const U=G&&G.use||{},v=(fish&&(U.fish||{})[fish]||{})[type+' - '+ret]||((U.lures||{})[type]||{})[ret];return v?v+'x':null};
-const useCell=(G,t,r,fish)=>{const u=lureUse(G,t,r,fish),v=lureSpeed(G,t,r);return u||v?`<strong>${u?'Use '+esc(u):'<span class="muted">Best speed not confirmed</span>'}</strong>${v?`<br><small class="muted">Works at ${esc(v)}</small>`:''}`:'<span class="muted">Not listed</span>'};
-const SPEED_NOTE='Reel speed is the 1x to 6x setting you change while reeling. Every lure works across the full 1x to 6x range in the game (the wiki says 1 to 5). The range is the same whatever the fish, so a fish-specific speed is not confirmed. No speed is listed for soft plastics on a jig head.';
-// Every lure and retrieve this fish takes, best bite chance first, with the reel speed it works at.
+// Reel speed tips from Steam players (data/lure-speeds.json, loaded into G.use). No credible source gives a speed per lure
+// or fish, so these are shown as unverified player tips with their source. A tip without lures, retrieves or fish covers any.
+// Only for a retrieve the wiki says the lure works on, so a tip about lures never lands on a soft plastic or an unlisted retrieve.
+const tipsFor=(G,t,r,fish)=>!lureSpeed(G,t,r)?[]:((G&&G.use&&G.use.tips)||[]).filter(x=>(!x.lures||x.lures.includes(t))&&(!x.retrieves||x.retrieves.includes(r))&&(x.fish?x.fish.includes(fish):true));
+const tipSpeeds=tips=>{const v=[...new Set(tips.map(x=>x.speed))].sort((a,b)=>a-b);return v.length?`players say ${v.map(n=>n+'x').join(' or ')}${v.length>1?' (tips disagree)':''}`:null};
+const SPEED_NOTE='Reel speed is the 1x to 6x setting you change while reeling. Every lure works across the full range (the wiki says 1 to 5, but the game goes to 6x). No credible source says which speed is best for each lure or fish, so the speeds shown are tips from Steam players. They are unverified and sometimes disagree.';
+const tipList=tips=>tips.length?`<ol class="tipList">${tips.map(x=>`<li><strong>${x.speed}x</strong> ${x.lures?esc(x.lures.join(', '))+' · ':''}${x.retrieves?esc(x.retrieves.join(', ')):'Any retrieve'}${x.fish?' · '+esc(x.fish.length>2?'all '+x.fish.length+' '+x.fish[0].replace(/^\w+ /,'').toLowerCase()+' species':x.fish.join(', ')):''}: ${esc(x.text)} <a href="${esc(x.source.url)}" target="_blank" rel="noopener">${esc(x.source.title)}</a></li>`).join('')}</ol>`:'';
+// Every lure and retrieve this fish takes, best bite chance first, with the range it works at and the player tips that cover it.
 function speedTable(G,baits,fish){
   const rows=baits.filter(b=>isLureBait(b[0])).sort((a,b)=>b[1]-a[1]);
   if(!rows.length)return '<div class="mutedBox">It takes no lures.</div>';
-  return `<table class="hooks speeds"><thead><tr><th>Lure</th><th>Retrieve</th><th>Bite</th><th>Reel speed</th></tr></thead><tbody>${rows.map(([b,p])=>{const [t,r]=b.split(' - ');return `<tr><td>${esc(t)}</td><td>${esc(r)}</td><td>${p}%</td><td>${useCell(G,t,r,fish)}</td></tr>`}).join('')}</tbody></table><p class="note">${SPEED_NOTE}</p>`;
+  const used=new Set(),all=(G&&G.use&&G.use.tips)||[];
+  const body=rows.map(([b,p])=>{const [t,r]=b.split(' - '),v=lureSpeed(G,t,r),tips=tipsFor(G,t,r,fish);tips.forEach(x=>used.add(x));
+    const say=tipSpeeds(tips),refs=tips.map(x=>all.indexOf(x)).sort((a,b)=>a-b);
+    return `<tr><td>${esc(t)}</td><td>${esc(r)}</td><td>${p}%</td><td>${say?`<strong>${esc(say[0].toUpperCase()+say.slice(1))}</strong>`:'<span class="muted">No player tip</span>'}${v?`<br><small class="muted">Works at ${esc(v)}</small>`:say?'':'<br><small class="muted">Speed not listed</small>'}</td></tr>`}).join('');
+  const tips=all.filter(x=>used.has(x)).sort((a,b)=>!!b.fish-!!a.fish);
+  return `<table class="hooks speeds"><thead><tr><th>Lure</th><th>Retrieve</th><th>Bite</th><th>Reel speed</th></tr></thead><tbody>${body}</tbody></table>${tips.length?`<h3 class="tipHead">Player tips (Steam, unverified)</h3>${tipList(tips)}`:''}<p class="note">${SPEED_NOTE}</p>`;
 }
 const match=(d,n,q)=>[n,...d.baits.map(b=>b[0]),...d.habitats,...(d.traits||[])].some(x=>x.toLowerCase().includes(q));
 const imgFail=i=>{const f=document.createElement('div');f.className='imgFallback';f.textContent='🐟';i.replaceWith(f)};
@@ -66,7 +73,7 @@ const HOOK_NOT_SOLD=new Set(['5/0','6/0','7/0','8/0','9/0','10/0']);
 // ---------------------------------------------------------------- guide data (loaded on demand)
 const GD={};
 function guide(name){return GD[name]||(GD[name]=fetch('./data/'+name+'.json').then(r=>{if(!r.ok)throw new Error(r.status);return r.json()}).catch(e=>{delete GD[name];throw e}))}
-// The gear guide also carries the tested reel speeds (data/lure-speeds.json) as G.use; without them speeds show as not confirmed.
+// The gear guide also carries the Steam players' reel speed tips (data/lure-speeds.json) as G.use; without them no tips show.
 const gearGuide=()=>GD.gearUse||(GD.gearUse=Promise.all([guide('gear'),guide('lure-speeds').catch(()=>({}))]).then(([G,U])=>(G.use=U,G)).catch(e=>{delete GD.gearUse;throw e}));
 const loadFail='<div class="mutedBox">This guide could not be loaded. It needs the app opened from a web address, or a connection the first time.</div>';
 
@@ -610,7 +617,7 @@ async function catchGuide(l,L){
   const isLure=b=>isLureBait(b[0]),lures=top.filter(isLure),naturals=top.filter(b=>!isLure(b));
   // Lures grouped by type with their best retrieves and reel speed, e.g. "Spinnerbait (Constant 1x–6x, Twitching 1x–6x)".
   const byLure={};for(const [b] of lures){const [t,s]=b.split(' - ');(byLure[t]=byLure[t]||[]).push(s)}
-  const lureText=Object.entries(byLure).map(([t,s])=>`${t} (${s.map(r=>{const v=lureSpeed(G,t,r);const u=lureUse(G,t,r,l.name);return G?`${r} ${u?'at '+u:v?v+', best speed not confirmed':'speed not listed'}`:r}).join(', ')})`);
+  const lureText=Object.entries(byLure).map(([t,s])=>`${t} (${s.map(r=>{const say=tipSpeeds(tipsFor(G,t,r,l.name));return G?`${r}: ${say||'no player tip'}`:r}).join(', ')})`);
   const [dMin,dMax]=(String(l.spawnDepth||'').match(/[\d.]+/g)||[]).map(Number);
   const deep=dMin>=10;
   const baitRig=trait('Bottom Lurker')||trait('Patient Scavenger')||deep?'Bottom':'Float';
@@ -734,12 +741,12 @@ function gearList(G,tab){
   const sortKey={Rods:'Max Line Strength',Reels:'Max Drag',Lines:'Test Weight',Hooks:null,Lures:null}[tab];
   const types=[...new Set(cat.items.map(x=>x.stats.Type).filter(Boolean))].sort();
   const price=s=>s.Price||(s['💰 Credits']?s['💰 Credits']+' credits':null)||(s['💎 Diamond Trophy Tokens']?s['💎 Diamond Trophy Tokens']+' 💎 tokens':null)||(s['🥇 Gold Trophy Tokens']?s['🥇 Gold Trophy Tokens']+' 🥇 tokens':null)||(s['👑 Legendary Trophy Tokens']?s['👑 Legendary Trophy Tokens']+' 👑 tokens':null)||(s['🎟️ Event Tokens']?'Event':null)||(s.Reputation?s.Reputation+' rep':null);
-  $('#gearBody').innerHTML=`${cat.intro&&cat.intro.length?`<p class="note gearIntro">${esc(cat.intro[0])}</p>`:''}<div class="searchbar"><input class="input" id="gq" placeholder="Search ${tab.toLowerCase()}…">${types.length>1?`<select class="select" id="gtype"><option value="">All types</option>${opts(types)}</select>`:''}</div><div id="gcount" class="note"></div><div class="gearGrid" id="gearGrid"></div>`;
+  $('#gearBody').innerHTML=`${cat.intro&&cat.intro.length?`<p class="note gearIntro">${esc(cat.intro[0])}</p>`:''}<div class="searchbar"><input class="input" id="gq" placeholder="Search ${tab.toLowerCase()}…">${types.length>1?`<select class="select" id="gtype"><option value="">All types</option>${opts(types)}</select>`:''}</div><div id="gcount" class="note"></div><div class="gearGrid" id="gearGrid"></div>${tab==='Lures'&&G.use&&G.use.tips?`<div class="card section"><h2>Player tips (Steam, unverified)</h2><p class="note">No credible source says which reel speed is best, so these are tips from Steam players. The cards above show the ones that apply to any fish. Tips for one fish also appear on that fish's page.</p>${tipList(G.use.tips)}</div>`:''}`;
   const draw=()=>{const q=$('#gq').value.trim().toLowerCase(),ty=$('#gtype')?$('#gtype').value:'';
     let list=cat.items.filter(x=>(!q||x.name.toLowerCase().includes(q))&&(!ty||x.stats.Type===ty));
     if(sortKey)list=list.slice().sort((a,b)=>(num(a.stats[sortKey])||0)-(num(b.stats[sortKey])||0));
     $('#gcount').textContent=`${list.length} of ${cat.items.length}`;
-    $('#gearGrid').innerHTML=list.map(x=>{const s=x.stats,p=price(s);return `<div class="gearItem"><strong>${esc(x.name)}</strong>${/requires|DLC/i.test(x.about)?`<small class="muted">${esc(x.about)}</small>`:''}<dl>${cols.filter(c=>s[c]).map(c=>`<div><dt>${esc(c)}</dt><dd>${esc(/Strength|Drag|Test Weight/.test(c)?kgfmt(num(s[c])):s[c])}</dd></div>`).join('')}${s.Level?`<div><dt>Level</dt><dd>${esc(s.Level)}</dd></div>`:''}${p?`<div><dt>Price</dt><dd>${esc(p)}</dd></div>`:''}${x.speeds?`<div class="speedRow"><dt>Reel speed</dt><dd>${x.speeds.length?x.speeds.map(v=>`${esc(v.retrieve)}: ${lureUse(G,x.name,v.retrieve)?'usually '+lureUse(G,x.name,v.retrieve):'best speed not confirmed'} <small class="muted">(works at ${v.min}x–${v.max}x)</small>`).join('<br>'):'Not listed by the wiki'}</dd></div>`:''}</dl></div>`}).join('')||'<div class="mutedBox">Nothing matches.</div>'};
+    $('#gearGrid').innerHTML=list.map(x=>{const s=x.stats,p=price(s);return `<div class="gearItem"><strong>${esc(x.name)}</strong>${/requires|DLC/i.test(x.about)?`<small class="muted">${esc(x.about)}</small>`:''}<dl>${cols.filter(c=>s[c]).map(c=>`<div><dt>${esc(c)}</dt><dd>${esc(/Strength|Drag|Test Weight/.test(c)?kgfmt(num(s[c])):s[c])}</dd></div>`).join('')}${s.Level?`<div><dt>Level</dt><dd>${esc(s.Level)}</dd></div>`:''}${p?`<div><dt>Price</dt><dd>${esc(p)}</dd></div>`:''}${x.speeds?`<div class="speedRow"><dt>Reel speed</dt><dd>${x.speeds.length?x.speeds.map(v=>`${esc(v.retrieve)}: ${tipSpeeds(tipsFor(G,x.name,v.retrieve))||'no player tip'} <small class="muted">(works at ${v.min}x–${v.max}x)</small>`).join('<br>'):'Not listed by the wiki'}</dd></div>`:''}</dl></div>`}).join('')||'<div class="mutedBox">Nothing matches.</div>'};
   $('#gearBody').oninput=draw;$('#gearBody').onchange=draw;draw();
 }
 
