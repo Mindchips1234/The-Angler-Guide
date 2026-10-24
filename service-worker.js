@@ -1,7 +1,7 @@
 // Bump V on every release. Installed copies download the new files in the background
 // and show an "A new version is ready" banner; tapping Update switches to it.
 // Pictures, maps (img/) and 3D textures (fish-tex/) are cached the first time they're viewed.
-const V='angler-guide-v3-13',IMG='angler-guide-img-v2',SHELL=['./','./index.html','./app.js','./data/fish-data.js','./data/legendary.json','./data/missions.json','./data/collectibles.json','./data/gear.json','./data/lure-speeds.json','./data/this-week.json','./manifest.webmanifest','./fish3d.js','./fish-shapes.js','./vendor/three.module.min.js','./icon-32.png','./browserconfig.xml','./mstile-150x150.png','./icon-192.png','./icon-512.png','./icon-maskable-512.png','./apple-touch-icon.png','./favicon.ico'];
+const V='angler-guide-v3-14',IMG='angler-guide-img-v2',SHELL=['./','./index.html','./app.js','./data/fish-data.js','./data/legendary.json','./data/missions.json','./data/collectibles.json','./data/gear.json','./data/lure-speeds.json','./data/this-week.json','./manifest.webmanifest','./fish3d.js','./fish-shapes.js','./vendor/three.module.min.js','./icon-32.png','./browserconfig.xml','./mstile-150x150.png','./icon-192.png','./icon-512.png','./icon-maskable-512.png','./apple-touch-icon.png','./favicon.ico'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(V).then(c=>c.addAll(SHELL.map(u=>new Request(u,{cache:'reload'})))).then(()=>{if(!self.registration.active)return self.skipWaiting()})));
 self.addEventListener('message',e=>{if(e.data==='skipWaiting')self.skipWaiting()});
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==V&&x!==IMG).map(x=>caches.delete(x)))).then(()=>self.clients.claim())));
