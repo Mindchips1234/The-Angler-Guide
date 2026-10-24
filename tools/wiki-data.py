@@ -203,13 +203,20 @@ def gear():
             s = soup(url); body = s.select_one('.taw.entry-content') or s.select_one('.entry-content')
             sp = specs(body)
             about = body.find('p') if body else None
-            return {'name': txt(s.select_one('h1.page-title')), 'about': clean(txt(about)), 'stats': sp}
+            name = txt(s.select_one('h1.page-title'))
+        for v in speeds:
+            if RECOMMENDED.get(name, {}).get(v['retrieve']): v['use'] = RECOMMENDED[name][v['retrieve']]
+        return {'name': name, 'about': clean(txt(about)), 'stats': sp}
         out[label] = {'intro': intro, 'items': pmap(one, urls)}
     out['Lures'] = lures()
     return out
 
 
 RETRIEVE = {'StopAndGo': 'Stop and Go'}
+# Speed to use for each lure and retrieve, e.g. {'Spinner': {'Constant': 2}}. No credible source publishes one, so these
+# come from in-game testing; a lure or retrieve left out shows as "not confirmed" in the app.
+RECOMMENDED = {}
+RECOMMENDED_SOURCE = ''
 GAME_MAX_SPEED = 6  # the wiki says "1 to 5", but the game's reel speed setting goes up to 6x (checked in game by Jude, 2026-10-24)
 def lures():
     """Lures and soft plastics from the Baits and Lures page. The wiki states the reel speed a lure works at per
@@ -228,10 +235,13 @@ def lures():
         stats['Type'] = sp['Category']
         if sp.get('Smallest'): stats['Hooks'] = sp['Smallest'] + (' to ' + sp['Largest'] if sp.get('Largest') not in (None, sp['Smallest']) else '')
         about = body.find('p')
-        return {'name': txt(s.select_one('h1.page-title')), 'about': clean(txt(about)) if about and 'taw-eyebrow' not in (about.get('class') or []) else '',
+        name = txt(s.select_one('h1.page-title'))
+        for v in speeds:
+            if RECOMMENDED.get(name, {}).get(v['retrieve']): v['use'] = RECOMMENDED[name][v['retrieve']]
+        return {'name': name, 'about': clean(txt(about)) if about and 'taw-eyebrow' not in (about.get('class') or []) else '',
                 'stats': stats, 'speeds': speeds, 'source': url}
     intro = ['The reel speed is the 1x to 6x retrieve setting you change while reeling in. Every lure works at 1x to 6x on every retrieve it supports (the wiki says 1 to 5, but the game goes up to 6x). No different speed is given for each fish, and no speed is listed for soft plastics fished on a jig head.']
-    return {'intro': intro, 'items': [x for x in pmap(one, urls) if x]}
+    return {'intro': intro, 'recommendedSource': RECOMMENDED_SOURCE, 'items': [x for x in pmap(one, urls) if x]}
 
 
 # ---------------------------------------------------------------------- fish refresh

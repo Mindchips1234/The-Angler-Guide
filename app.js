@@ -29,12 +29,15 @@ const prefText=d=>d.preferred||'Not listed';
 // One range per lure and retrieve, the same for every fish; null when the wiki lists none (soft plastics).
 const isLureBait=b=>/ - (Constant|Jigging|Stop and Go|Twitching)$/.test(b);
 const lureSpeed=(G,type,ret)=>{const x=G&&G.Lures&&G.Lures.items.find(i=>i.name===type),v=x&&x.speeds.find(v=>v.retrieve===ret);return v?`${v.min}x–${v.max}x`:null};
+// The speed to use (v.use, from in-game testing) when one is confirmed, else null.
+const lureUse=(G,type,ret)=>{const x=G&&G.Lures&&G.Lures.items.find(i=>i.name===type),v=x&&x.speeds.find(v=>v.retrieve===ret);return v&&v.use?v.use+'x':null};
+const useCell=(G,t,r)=>{const u=lureUse(G,t,r),v=lureSpeed(G,t,r);return v?`<strong>${u?'Use '+esc(u):'<span class="muted">Best speed not confirmed</span>'}</strong><br><small class="muted">Works at ${esc(v)}</small>`:'<span class="muted">Not listed</span>'};
 const SPEED_NOTE='Reel speed is the 1x to 6x setting you change while reeling. Every lure works across the full 1x to 6x range in the game (the wiki says 1 to 5). The range is the same whatever the fish, so a fish-specific speed is not confirmed. No speed is listed for soft plastics on a jig head.';
 // Every lure and retrieve this fish takes, best bite chance first, with the reel speed it works at.
 function speedTable(G,baits){
   const rows=baits.filter(b=>isLureBait(b[0])).sort((a,b)=>b[1]-a[1]);
   if(!rows.length)return '<div class="mutedBox">It takes no lures.</div>';
-  return `<table class="hooks speeds"><thead><tr><th>Lure</th><th>Retrieve</th><th>Bite</th><th>Reel speed</th></tr></thead><tbody>${rows.map(([b,p])=>{const [t,r]=b.split(' - '),v=lureSpeed(G,t,r);return `<tr><td>${esc(t)}</td><td>${esc(r)}</td><td>${p}%</td><td>${v?esc(v):'<span class="muted">Not listed</span>'}</td></tr>`}).join('')}</tbody></table><p class="note">${SPEED_NOTE}</p>`;
+  return `<table class="hooks speeds"><thead><tr><th>Lure</th><th>Retrieve</th><th>Bite</th><th>Reel speed</th></tr></thead><tbody>${rows.map(([b,p])=>{const [t,r]=b.split(' - ');return `<tr><td>${esc(t)}</td><td>${esc(r)}</td><td>${p}%</td><td>${useCell(G,t,r)}</td></tr>`}).join('')}</tbody></table><p class="note">${SPEED_NOTE}</p>`;
 }
 const match=(d,n,q)=>[n,...d.baits.map(b=>b[0]),...d.habitats,...(d.traits||[])].some(x=>x.toLowerCase().includes(q));
 const imgFail=i=>{const f=document.createElement('div');f.className='imgFallback';f.textContent='🐟';i.replaceWith(f)};
@@ -604,7 +607,7 @@ async function catchGuide(l,L){
   const isLure=b=>isLureBait(b[0]),lures=top.filter(isLure),naturals=top.filter(b=>!isLure(b));
   // Lures grouped by type with their best retrieves and reel speed, e.g. "Spinnerbait (Constant 1x–6x, Twitching 1x–6x)".
   const byLure={};for(const [b] of lures){const [t,s]=b.split(' - ');(byLure[t]=byLure[t]||[]).push(s)}
-  const lureText=Object.entries(byLure).map(([t,s])=>`${t} (${s.map(r=>{const v=lureSpeed(G,t,r);return G?`${r} ${v||'speed not listed'}`:r}).join(', ')})`);
+  const lureText=Object.entries(byLure).map(([t,s])=>`${t} (${s.map(r=>{const v=lureSpeed(G,t,r);const u=lureUse(G,t,r);return G?`${r} ${u?'at '+u:v?v+', best speed not confirmed':'speed not listed'}`:r}).join(', ')})`);
   const [dMin,dMax]=(String(l.spawnDepth||'').match(/[\d.]+/g)||[]).map(Number);
   const deep=dMin>=10;
   const baitRig=trait('Bottom Lurker')||trait('Patient Scavenger')||deep?'Bottom':'Float';
@@ -733,7 +736,7 @@ function gearList(G,tab){
     let list=cat.items.filter(x=>(!q||x.name.toLowerCase().includes(q))&&(!ty||x.stats.Type===ty));
     if(sortKey)list=list.slice().sort((a,b)=>(num(a.stats[sortKey])||0)-(num(b.stats[sortKey])||0));
     $('#gcount').textContent=`${list.length} of ${cat.items.length}`;
-    $('#gearGrid').innerHTML=list.map(x=>{const s=x.stats,p=price(s);return `<div class="gearItem"><strong>${esc(x.name)}</strong>${/requires|DLC/i.test(x.about)?`<small class="muted">${esc(x.about)}</small>`:''}<dl>${cols.filter(c=>s[c]).map(c=>`<div><dt>${esc(c)}</dt><dd>${esc(/Strength|Drag|Test Weight/.test(c)?kgfmt(num(s[c])):s[c])}</dd></div>`).join('')}${s.Level?`<div><dt>Level</dt><dd>${esc(s.Level)}</dd></div>`:''}${p?`<div><dt>Price</dt><dd>${esc(p)}</dd></div>`:''}${x.speeds?`<div class="speedRow"><dt>Reel speed</dt><dd>${x.speeds.length?x.speeds.map(v=>`${esc(v.retrieve)} ${v.min}x–${v.max}x`).join('<br>'):'Not listed by the wiki'}</dd></div>`:''}</dl></div>`}).join('')||'<div class="mutedBox">Nothing matches.</div>'};
+    $('#gearGrid').innerHTML=list.map(x=>{const s=x.stats,p=price(s);return `<div class="gearItem"><strong>${esc(x.name)}</strong>${/requires|DLC/i.test(x.about)?`<small class="muted">${esc(x.about)}</small>`:''}<dl>${cols.filter(c=>s[c]).map(c=>`<div><dt>${esc(c)}</dt><dd>${esc(/Strength|Drag|Test Weight/.test(c)?kgfmt(num(s[c])):s[c])}</dd></div>`).join('')}${s.Level?`<div><dt>Level</dt><dd>${esc(s.Level)}</dd></div>`:''}${p?`<div><dt>Price</dt><dd>${esc(p)}</dd></div>`:''}${x.speeds?`<div class="speedRow"><dt>Reel speed</dt><dd>${x.speeds.length?x.speeds.map(v=>`${esc(v.retrieve)}: ${v.use?'use '+v.use+'x':'best speed not confirmed'} <small class="muted">(works at ${v.min}x–${v.max}x)</small>`).join('<br>'):'Not listed by the wiki'}</dd></div>`:''}</dl></div>`}).join('')||'<div class="mutedBox">Nothing matches.</div>'};
   $('#gearBody').oninput=draw;$('#gearBody').onchange=draw;draw();
 }
 
