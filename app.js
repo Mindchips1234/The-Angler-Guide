@@ -29,15 +29,16 @@ const prefText=d=>d.preferred||'Not listed';
 // One range per lure and retrieve, the same for every fish; null when the wiki lists none (soft plastics).
 const isLureBait=b=>/ - (Constant|Jigging|Stop and Go|Twitching)$/.test(b);
 const lureSpeed=(G,type,ret)=>{const x=G&&G.Lures&&G.Lures.items.find(i=>i.name===type),v=x&&x.speeds.find(v=>v.retrieve===ret);return v?`${v.min}x–${v.max}x`:null};
-// The speed to use (v.use, from in-game testing) when one is confirmed, else null.
-const lureUse=(G,type,ret)=>{const x=G&&G.Lures&&G.Lures.items.find(i=>i.name===type),v=x&&x.speeds.find(v=>v.retrieve===ret);return v&&v.use?v.use+'x':null};
-const useCell=(G,t,r)=>{const u=lureUse(G,t,r),v=lureSpeed(G,t,r);return v?`<strong>${u?'Use '+esc(u):'<span class="muted">Best speed not confirmed</span>'}</strong><br><small class="muted">Works at ${esc(v)}</small>`:'<span class="muted">Not listed</span>'};
+// The speed to use from in-game testing (data/lure-speeds.json, loaded into G.use): the fish's own speed for that lure
+// and retrieve, else the lure's general one, else null (not confirmed).
+const lureUse=(G,type,ret,fish)=>{const U=G&&G.use||{},v=(fish&&(U.fish||{})[fish]||{})[type+' - '+ret]||((U.lures||{})[type]||{})[ret];return v?v+'x':null};
+const useCell=(G,t,r,fish)=>{const u=lureUse(G,t,r,fish),v=lureSpeed(G,t,r);return u||v?`<strong>${u?'Use '+esc(u):'<span class="muted">Best speed not confirmed</span>'}</strong>${v?`<br><small class="muted">Works at ${esc(v)}</small>`:''}`:'<span class="muted">Not listed</span>'};
 const SPEED_NOTE='Reel speed is the 1x to 6x setting you change while reeling. Every lure works across the full 1x to 6x range in the game (the wiki says 1 to 5). The range is the same whatever the fish, so a fish-specific speed is not confirmed. No speed is listed for soft plastics on a jig head.';
 // Every lure and retrieve this fish takes, best bite chance first, with the reel speed it works at.
-function speedTable(G,baits){
+function speedTable(G,baits,fish){
   const rows=baits.filter(b=>isLureBait(b[0])).sort((a,b)=>b[1]-a[1]);
   if(!rows.length)return '<div class="mutedBox">It takes no lures.</div>';
-  return `<table class="hooks speeds"><thead><tr><th>Lure</th><th>Retrieve</th><th>Bite</th><th>Reel speed</th></tr></thead><tbody>${rows.map(([b,p])=>{const [t,r]=b.split(' - ');return `<tr><td>${esc(t)}</td><td>${esc(r)}</td><td>${p}%</td><td>${useCell(G,t,r)}</td></tr>`}).join('')}</tbody></table><p class="note">${SPEED_NOTE}</p>`;
+  return `<table class="hooks speeds"><thead><tr><th>Lure</th><th>Retrieve</th><th>Bite</th><th>Reel speed</th></tr></thead><tbody>${rows.map(([b,p])=>{const [t,r]=b.split(' - ');return `<tr><td>${esc(t)}</td><td>${esc(r)}</td><td>${p}%</td><td>${useCell(G,t,r,fish)}</td></tr>`}).join('')}</tbody></table><p class="note">${SPEED_NOTE}</p>`;
 }
 const match=(d,n,q)=>[n,...d.baits.map(b=>b[0]),...d.habitats,...(d.traits||[])].some(x=>x.toLowerCase().includes(q));
 const imgFail=i=>{const f=document.createElement('div');f.className='imgFallback';f.textContent='🐟';i.replaceWith(f)};
@@ -65,6 +66,8 @@ const HOOK_NOT_SOLD=new Set(['5/0','6/0','7/0','8/0','9/0','10/0']);
 // ---------------------------------------------------------------- guide data (loaded on demand)
 const GD={};
 function guide(name){return GD[name]||(GD[name]=fetch('./data/'+name+'.json').then(r=>{if(!r.ok)throw new Error(r.status);return r.json()}).catch(e=>{delete GD[name];throw e}))}
+// The gear guide also carries the tested reel speeds (data/lure-speeds.json) as G.use; without them speeds show as not confirmed.
+const gearGuide=()=>GD.gearUse||(GD.gearUse=Promise.all([guide('gear'),guide('lure-speeds').catch(()=>({}))]).then(([G,U])=>(G.use=U,G)).catch(e=>{delete GD.gearUse;throw e}));
 const loadFail='<div class="mutedBox">This guide could not be loaded. It needs the app opened from a web address, or a connection the first time.</div>';
 
 // ---------------------------------------------------------------- saved progress (this device)
@@ -312,7 +315,7 @@ function fishPage(f){
     tiers=[...new Set(d.baits.map(b=>b[1]))].sort((a,b)=>b-a),
     baits=tiers.map(p=>`<div class="tier">${p}%</div>`+d.baits.filter(b=>b[1]===p).map(b=>`<span class="tag${isPref(b[0],d.preferred)?' pref':''}">${isPref(b[0],d.preferred)?'★ ':''}${esc(b[0])}</span>`).join('')).join('');
     fv.innerHTML=`<div class="hero"><div class="eyebrow">${esc(R)} · Fish guide</div><h1>${esc(f)}</h1><div class="stats" id="fpills"></div><div class="fishTools"><button class="toolAction primary" id="logThis">＋ Log a catch</button><button class="toolAction" id="copyFishSetup">Copy fishing setup</button></div><div id="fbest" class="note"></div><div id="fishActionNote" class="note" aria-live="polite"></div></div><div class="detailgrid section"><div><div class="card"><button type="button" class="imageWrap open3d" id="open3d" aria-label="View ${esc(f)} in 3D" aria-haspopup="dialog"><img class="heroimg" src="${d.image}" alt="${esc(f)}" onerror="imgFail(this)"><span class="badge3d" aria-hidden="true">3D · Tap to view</span></button><div class="rows" id="ffacts" style="margin-top:12px"></div><div class="section"><h2>Habitat</h2>${tag(d.habitats)}</div></div><div class="card" style="margin-top:18px"><h2>Hotspot map</h2>${d.hotspotMap?`<div class="map" id="fmap"></div><div class="note">${esc(d.hotspotStatus||'')} Drag to pan, pinch or +/− to zoom.</div>`:'<div class="mutedBox">No hotspot map is published for this species yet.</div>'}</div></div><div><div class="card"><h2>Ranks, weights &amp; hooks</h2><div id="franks"></div></div><div class="card" style="margin-top:18px"><h2>Bait &amp; lure preferences</h2>${baits}</div><div class="card" style="margin-top:18px"><h2>Reel speed for its lures</h2><div id="fspeeds"><div class="mutedBox">Loading…</div></div></div><div class="card" style="margin-top:18px"><h2>Traits</h2>${tag(d.traits)}</div></div></div><div class="source">Source: <a href="${d.source}" target="_blank" rel="noopener">The Angler Wiki</a> (community-maintained; may contain errors).</div>`;
-    guide('gear').then(G=>{const el=$('#fspeeds');if(el&&built===key)el.innerHTML=speedTable(G,d.baits)}).catch(()=>{const el=$('#fspeeds');if(el)el.innerHTML='<div class="mutedBox">Couldn\'t load the lure list. Check your connection and reopen this page.</div>'});
+    gearGuide().then(G=>{const el=$('#fspeeds');if(el&&built===key)el.innerHTML=speedTable(G,d.baits,f)}).catch(()=>{const el=$('#fspeeds');if(el)el.innerHTML='<div class="mutedBox">Couldn\'t load the lure list. Check your connection and reopen this page.</div>'});
     if(d.hotspotMap)mkMap($('#fmap'),r.map).show(d.hotspotMap);
     import('./fish3d.js').catch(()=>{}); // warm up so the 3D pop-up opens quickly
   }
@@ -600,14 +603,14 @@ const TRAIT_TIPS={
 };
 async function catchGuide(l,L){
   const box=$('#catchGuide');if(!box)return;
-  let G=null;try{G=await guide('gear')}catch(e){}
-  const ls=$('#lspeeds');if(ls)ls.innerHTML=G?speedTable(G,l.baits):'<div class="mutedBox">Couldn\'t load the lure list. Check your connection and reopen this page.</div>';
+  let G=null;try{G=await gearGuide()}catch(e){}
+  const ls=$('#lspeeds');if(ls)ls.innerHTML=G?speedTable(G,l.baits,l.name):'<div class="mutedBox">Couldn\'t load the lure list. Check your connection and reopen this page.</div>';
   const act=(await activeLegends())[l.reserves[0]];if(!$('#catchGuide'))return;
   const trait=n=>l.traits.some(t=>t.name===n),top=l.baits.length?l.baits.filter(b=>b[1]===l.baits[0][1]):[];
   const isLure=b=>isLureBait(b[0]),lures=top.filter(isLure),naturals=top.filter(b=>!isLure(b));
   // Lures grouped by type with their best retrieves and reel speed, e.g. "Spinnerbait (Constant 1x–6x, Twitching 1x–6x)".
   const byLure={};for(const [b] of lures){const [t,s]=b.split(' - ');(byLure[t]=byLure[t]||[]).push(s)}
-  const lureText=Object.entries(byLure).map(([t,s])=>`${t} (${s.map(r=>{const v=lureSpeed(G,t,r);const u=lureUse(G,t,r);return G?`${r} ${u?'at '+u:v?v+', best speed not confirmed':'speed not listed'}`:r}).join(', ')})`);
+  const lureText=Object.entries(byLure).map(([t,s])=>`${t} (${s.map(r=>{const v=lureSpeed(G,t,r);const u=lureUse(G,t,r,l.name);return G?`${r} ${u?'at '+u:v?v+', best speed not confirmed':'speed not listed'}`:r}).join(', ')})`);
   const [dMin,dMax]=(String(l.spawnDepth||'').match(/[\d.]+/g)||[]).map(Number);
   const deep=dMin>=10;
   const baitRig=trait('Bottom Lurker')||trait('Patient Scavenger')||deep?'Bottom':'Float';
@@ -692,7 +695,7 @@ function updateCkCounts(kind,groups,rn,isM){ // refresh the totals without rebui
 // Gear guide: a setup helper plus searchable lists of rods, reels, lines and hooks.
 const num=s=>{const m=String(s||'').replace(/,/g,'').match(/[\d.]+/);return m?+m[0]:null};
 async function buildGear(){
-  const G=await guide('gear');if(screen!=='guide')return;
+  const G=await gearGuide();if(screen!=='guide')return;
   const tab=store.get('gearTab','helper');
   document.title='Gear guide · Angler Guide';
   gv.innerHTML=guideTitle('Guides','Gear guide','Pick a fish for a suggested setup, or browse every rod, reel, line, hook and lure in the game.')
@@ -736,7 +739,7 @@ function gearList(G,tab){
     let list=cat.items.filter(x=>(!q||x.name.toLowerCase().includes(q))&&(!ty||x.stats.Type===ty));
     if(sortKey)list=list.slice().sort((a,b)=>(num(a.stats[sortKey])||0)-(num(b.stats[sortKey])||0));
     $('#gcount').textContent=`${list.length} of ${cat.items.length}`;
-    $('#gearGrid').innerHTML=list.map(x=>{const s=x.stats,p=price(s);return `<div class="gearItem"><strong>${esc(x.name)}</strong>${/requires|DLC/i.test(x.about)?`<small class="muted">${esc(x.about)}</small>`:''}<dl>${cols.filter(c=>s[c]).map(c=>`<div><dt>${esc(c)}</dt><dd>${esc(/Strength|Drag|Test Weight/.test(c)?kgfmt(num(s[c])):s[c])}</dd></div>`).join('')}${s.Level?`<div><dt>Level</dt><dd>${esc(s.Level)}</dd></div>`:''}${p?`<div><dt>Price</dt><dd>${esc(p)}</dd></div>`:''}${x.speeds?`<div class="speedRow"><dt>Reel speed</dt><dd>${x.speeds.length?x.speeds.map(v=>`${esc(v.retrieve)}: ${v.use?'use '+v.use+'x':'best speed not confirmed'} <small class="muted">(works at ${v.min}x–${v.max}x)</small>`).join('<br>'):'Not listed by the wiki'}</dd></div>`:''}</dl></div>`}).join('')||'<div class="mutedBox">Nothing matches.</div>'};
+    $('#gearGrid').innerHTML=list.map(x=>{const s=x.stats,p=price(s);return `<div class="gearItem"><strong>${esc(x.name)}</strong>${/requires|DLC/i.test(x.about)?`<small class="muted">${esc(x.about)}</small>`:''}<dl>${cols.filter(c=>s[c]).map(c=>`<div><dt>${esc(c)}</dt><dd>${esc(/Strength|Drag|Test Weight/.test(c)?kgfmt(num(s[c])):s[c])}</dd></div>`).join('')}${s.Level?`<div><dt>Level</dt><dd>${esc(s.Level)}</dd></div>`:''}${p?`<div><dt>Price</dt><dd>${esc(p)}</dd></div>`:''}${x.speeds?`<div class="speedRow"><dt>Reel speed</dt><dd>${x.speeds.length?x.speeds.map(v=>`${esc(v.retrieve)}: ${lureUse(G,x.name,v.retrieve)?'usually '+lureUse(G,x.name,v.retrieve):'best speed not confirmed'} <small class="muted">(works at ${v.min}x–${v.max}x)</small>`).join('<br>'):'Not listed by the wiki'}</dd></div>`:''}</dl></div>`}).join('')||'<div class="mutedBox">Nothing matches.</div>'};
   $('#gearBody').oninput=draw;$('#gearBody').onchange=draw;draw();
 }
 

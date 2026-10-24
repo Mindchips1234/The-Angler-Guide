@@ -1,0 +1,6 @@
+{
+ "_about": "Reel speed to use, from Jude's in-game testing (no credible published source has one). 'fish' maps a fish name (as in the app) to {'Lure - Retrieve': speed}; 'lures' maps a lure to {'Retrieve': speed} as the fallback for any fish without its own speed. Anything left out shows as 'best speed not confirmed'.",
+ "source": "",
+ "fish": {},
+ "lures": {}
+}
